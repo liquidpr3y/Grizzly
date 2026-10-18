@@ -26,7 +26,7 @@ contourpy==1.4.0
     # via matplotlib
 cycler==0.12.1
     # via matplotlib
-fastapi==0.144.0
+fastapi==0.146.0
     # via grizzly (pyproject.toml)
 filelock==4.2.2
     # via
@@ -111,7 +111,7 @@ packaging==26.3
     #   transformers
 piexif==1.1.3
     # via mflux
-pillow==13.0.0
+pillow==12.3.0
     # via
     #   grizzly (pyproject.toml)
     #   matplotlib

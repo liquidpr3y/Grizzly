@@ -61,3 +61,8 @@ def test_doctor_with_mock_profile(tmp_path):
 
     assert run_doctor(load_profile("mock"), tmp_path) == 0
     assert (tmp_path / "doctor_512x512.png").exists()
+
+
+def test_pillow_typing_module_imports():
+    # mflux imports PIL._typing at runtime; Pillow 13.0 fails there on Python <3.15.
+    import PIL._typing  # noqa: F401
