@@ -43,6 +43,8 @@ class MockLLM:
     def chat(self, messages: list[Message], max_tokens: int, temperature: float) -> str:
         system = messages[0]["content"]
         task = re.match(r"TASK: (\w+)", system).group(1)
+        if task == "ping":
+            return json.dumps({"title": "Mock Title", "logline": "A mock logline."})
         if task == "bible":
             return "Here is the bible:\n```json\n" + json.dumps(_BIBLE) + "\n```"
         if task == "outline":

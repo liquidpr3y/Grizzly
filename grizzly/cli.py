@@ -49,6 +49,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--scenes", type=int, default=4)
     p.add_argument("--shots", type=int, default=4)
 
+    p = sub.add_parser("doctor", help="check the machine and load/test each model")
+    p.add_argument("--skip-llm", action="store_true")
+    p.add_argument("--skip-image", action="store_true")
+
     p = sub.add_parser("serve", help="start the local web studio")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8642)
@@ -83,6 +87,10 @@ def main(argv: list[str] | None = None) -> int:
             n_scenes=args.scenes, n_shots=args.shots,
         )
         print(f"Done in {time.time() - start:.0f}s -> {out}")
+    elif args.cmd == "doctor":
+        from grizzly.doctor import run_doctor
+
+        return run_doctor(profile, store.base.parent, args.skip_llm, args.skip_image, args.verbose)
     elif args.cmd == "serve":
         try:
             import uvicorn

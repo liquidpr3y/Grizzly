@@ -53,3 +53,11 @@ def test_model_manager_swaps():
     mm.acquire("llm")
     mm.acquire("image")
     assert events == ["load llm", "unload llm", "load image"]
+
+
+def test_doctor_with_mock_profile(tmp_path):
+    from grizzly.config import load_profile
+    from grizzly.doctor import run_doctor
+
+    assert run_doctor(load_profile("mock"), tmp_path) == 0
+    assert (tmp_path / "doctor_512x512.png").exists()

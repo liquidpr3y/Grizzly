@@ -19,6 +19,7 @@ git clone https://github.com/liquidpr3y/Grizzly && cd Grizzly
 uv venv && source .venv/bin/activate
 uv pip install -e '.[mac,server]'
 
+grizzly doctor          # checks MLX, then loads and tests each model on its own
 grizzly new "The Lighthouse Signal" "A young keeper discovers the lighthouse beam is answering something beneath the sea." --format comic
 grizzly -v run the_lighthouse_signal --scenes 3 --shots 4
 
