@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grizzly Studio</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --panel: #ffffff; --ink: #1d1c1a; --muted: #6b6862; --line: #e3e0da;
+    --accent: #b5552b; --accent-ink: #ffffff; --ok: #2f7d4f; --warn: #a86b00; --bad: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #141312; --panel: #1d1c1a; --ink: #eceae6; --muted: #a29e97; --line: #33312d;
+            --accent: #e07a4a; --accent-ink: #141312; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 -apple-system, system-ui, sans-serif; }
+  header { display: flex; align-items: baseline; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 18px; margin: 0; }
+  header .info { color: var(--muted); font-size: 12px; }
+  .layout { display: grid; grid-template-columns: 280px 1fr; min-height: calc(100vh - 52px); }
+  aside { border-right: 1px solid var(--line); padding: 16px; }
+  main { padding: 20px; min-width: 0; }
+  h2 { font-size: 15px; margin: 0 0 10px; }
+  h3 { font-size: 13px; margin: 18px 0 8px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  input, textarea, select { width: 100%; font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+  textarea { resize: vertical; min-height: 60px; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  .plist a { display: block; padding: 6px 8px; border-radius: 6px; color: inherit; text-decoration: none; }
+  .plist a.active, .plist a:hover { background: var(--panel); }
+  .plist small { color: var(--muted); }
+  form.new { display: grid; gap: 8px; margin-top: 18px; }
+  .steps { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+  .pill { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); margin-right: 4px; color: var(--muted); }
+  .pill.on { color: var(--ok); border-color: var(--ok); }
+  .job { font-size: 12px; color: var(--muted); min-height: 18px; }
+  .job.failed { color: var(--bad); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; display: grid; gap: 6px; align-content: start; }
+  .card img { width: 100%; border-radius: 4px; background: var(--line); aspect-ratio: auto; }
+  .card .meta { font-size: 12px; color: var(--muted); }
+  .line { font-size: 12px; }
+  .line b { color: var(--accent); }
+  .exports a { margin-right: 12px; color: var(--accent); }
+  .empty { color: var(--muted); padding: 40px 0; }
+  @media (max-width: 760px) { .layout { grid-template-columns: 1fr; } aside { border-right: 0; border-bottom: 1px solid var(--line); } }
+</style>
+</head>
+<body>
+<header><h1>Grizzly Studio</h1><span class="info" id="info"></span></header>
+<div class="layout">
+  <aside>
+    <h2>Projects</h2>
+    <div class="plist" id="plist"></div>
+    <form class="new" id="newform">
+      <h2>New project</h2>
+      <input name="title" placeholder="Title" required>
+      <textarea name="premise" placeholder="Premise: a few sentences about the story" required></textarea>
+      <select name="format">
+        <option value="comic">Comic</option>
+        <option value="vn">Visual novel</option>
+        <option value="film">Short film (animatic)</option>
+      </select>
+      <button class="primary">Create</button>
+    </form>
+  </aside>
+  <main id="main"><div class="empty">Create or pick a project.</div></main>
+</div>
+<script>
+const $ = (tag, attrs = {}, ...kids) => {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (k === "class") el.className = v;
+    else el.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) if (kid != null) el.append(kid);
+  return el;
+};
+const api = async (path, opts = {}) => {
+  const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
+  return res.json();
+};
+
+let current = null, data = null, bust = Date.now();
+const STEP_LABELS = { bible: "1. Bible", outline: "2. Outline", shots: "3. Shots", portraits: "4. Portraits", images: "5. Render", comic: "Comic", vn: "Visual novel", animatic: "Animatic" };
+const exports = {};
+
+async function loadList() {
+  const items = await api("/api/projects");
+  const list = document.getElementById("plist");
+  list.replaceChildren(...items.map(p => $("a", { href: "#" + p.id, class: p.id === current ? "active" : "", onclick: () => open(p.id) },
+    p.title, " ", $("small", {}, p.format))));
+}
+
+async function open(id) {
+  current = id;
+  data = await api(`/api/projects/${id}`);
+  render();
+  loadList();
+}
+
+function file(path) { return `/files/${current}/${path}?t=${bust}`; }
+
+async function save() {
+  data = await api(`/api/projects/${current}`, { method: "PUT", body: JSON.stringify(data.project) });
+  render();
+}
+
+async function runStep(step, body = {}) {
+  const job = await api(`/api/projects/${current}/steps/${step}`, { method: "POST", body: JSON.stringify(body) });
+  poll(job.id);
+}
+
+async function poll(jid) {
+  const el = document.getElementById("job");
+  const tick = async () => {
+    const job = await api(`/api/jobs/${jid}`);
+    if (el) { el.textContent = `${job.step}: ${job.state} ${job.progress || ""} ${job.error || ""}`; el.className = "job " + job.state; }
+    if (job.state === "done" || job.state === "failed") {
+      if (job.result) exports[job.step === "all" ? data.project.format : job.step] = job.result;
+      bust = Date.now();
+      if (job.project === current) open(current);
+      return;
+    }
+    setTimeout(tick, 1500);
+  };
+  tick();
+}
+
+function editable(obj, key, rows = 3) {
+  return $("textarea", { rows, oninput: e => { obj[key] = e.target.value; } }, obj[key] || "");
+}
+
+function render() {
+  const { project: p, status } = data;
+  const main = document.getElementById("main");
+  const b = p.bible;
+  main.replaceChildren(
+    $("h2", {}, p.title, " ", $("span", { class: "pill" }, p.format)),
+    $("div", { class: "meta" }, p.premise),
+    $("div", {}, ...Object.entries(status).map(([k, v]) => $("span", { class: "pill" + (v ? " on" : "") }, k))),
+    $("div", { class: "steps" },
+      $("button", { class: "primary", onclick: () => runStep("all") }, "Run everything"),
+      ...Object.entries(STEP_LABELS).map(([s, label]) => $("button", { onclick: () => runStep(s) }, label)),
+      $("button", { onclick: save }, "Save edits")),
+    $("div", { class: "job", id: "job" }),
+    $("div", { class: "exports" }, ...Object.entries(exports).map(([k, path]) => $("a", { href: `/files/${current}/${path}`, target: "_blank" }, `Open ${k}`))),
+    b ? bibleView(b) : null,
+    p.shots.length ? shotsView(p) : null,
+  );
+}
+
+function bibleView(b) {
+  return $("section", {},
+    $("h3", {}, "Story bible"),
+    $("div", {}, $("b", {}, b.title), " - ", b.logline),
+    $("label", {}, "Art style", editable(b, "art_style", 2)),
+    $("h3", {}, "Characters"),
+    $("div", { class: "cards" }, ...b.characters.map(c => $("div", { class: "card" },
+      c.portrait ? $("img", { src: file(c.portrait), alt: c.name }) : null,
+      $("div", {}, $("b", {}, c.name), " ", $("span", { class: "meta" }, c.role)),
+      $("div", { class: "meta" }, c.personality),
+      $("label", { class: "meta" }, "Appearance (used in every image)", editable(c, "appearance")),
+      $("label", { class: "meta" }, "macOS voice", $("input", { value: c.voice || "", placeholder: "e.g. Daniel", oninput: e => { c.voice = e.target.value; } })),
+    ))),
+    $("h3", {}, "Locations"),
+    $("div", { class: "cards" }, ...b.locations.map(l => $("div", { class: "card" }, $("b", {}, l.name), editable(l, "description")))),
+  );
+}
+
+function shotsView(p) {
+  const name = id => (p.bible.characters.find(c => c.id === id) || { name: id }).name;
+  return $("section", {},
+    $("h3", {}, `Shots (${p.shots.length})`),
+    $("div", { class: "cards" }, ...p.shots.map(s => $("div", { class: "card" },
+      s.image ? $("img", { src: file(s.image), alt: s.id }) : null,
+      $("div", { class: "meta" }, `${s.id} - ${s.character_ids.map(name).join(", ")}`),
+      $("select", { onchange: e => { s.framing = e.target.value; } },
+        ...["wide", "medium", "close-up"].map(f => { const o = $("option", { value: f }, f); if (f === s.framing) o.selected = true; return o; })),
+      editable(s, "action"),
+      s.narration ? $("div", { class: "line" }, $("i", {}, s.narration)) : null,
+      ...s.dialogue.map(d => $("div", { class: "line" }, $("b", {}, name(d.speaker) + ": "), d.text)),
+      $("button", { onclick: async () => { await save(); runStep("images", { only: [s.id] }); } }, "Save + re-render"),
+    ))),
+  );
+}
+
+document.getElementById("newform").addEventListener("submit", async e => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const p = await api("/api/projects", { method: "POST", body: JSON.stringify(Object.fromEntries(f)) });
+  e.target.reset();
+  open(p.id);
+});
+
+api("/api/info").then(i => { document.getElementById("info").textContent = `profile ${i.profile} - writer ${i.llm} - artist ${i.image}`; });
+loadList().then(() => { if (location.hash) open(location.hash.slice(1)); });
+</script>
+</body>
+</html>
