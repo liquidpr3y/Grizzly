@@ -16,7 +16,7 @@ Prototype, aimed at a **MacBook Pro M5 Pro with 24GB**.
 ```sh
 brew install ffmpeg uv
 git clone https://github.com/liquidpr3y/Grizzly && cd Grizzly
-uv venv && source .venv/bin/activate
+uv venv --python 3.12 && source .venv/bin/activate
 uv pip install -e '.[mac,server]'
 
 grizzly doctor          # checks MLX, then loads and tests each model on its own
