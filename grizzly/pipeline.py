@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import time
 from pathlib import Path
 from typing import Callable
 
 from grizzly.config import Profile
 from grizzly.image import create_image_model, create_ref_model
 from grizzly.llm import create_llm
-from grizzly.memory import ModelManager
+from grizzly.memory import ModelManager, peak_memory_gb
 from grizzly.models import Project
 from grizzly.render.animatic import build_animatic
 from grizzly.render.comic import build_comic
@@ -32,6 +34,7 @@ class Pipeline:
         self.profile = profile
         self.store = store
         self.models = ModelManager(swap=profile.swap_models)
+        self.last_failed_attempts = 0
         self.models.register("llm", lambda: create_llm(profile))
         self.models.register("image", lambda: create_image_model(profile))
         if profile.ref_backend:
@@ -56,6 +59,7 @@ class Pipeline:
         _require(project, step)
         if step in WRITE_STEPS:
             writer = Writer(self.models.acquire("llm"), self.profile)
+            self.last_failed_attempts = 0
             if progress:
                 progress(0, 1, f"writing {step}")
             if step == "bible":
@@ -66,6 +70,7 @@ class Pipeline:
                 project.shots = []
             else:
                 project.shots = writer.shots(project, n_shots)
+            self.last_failed_attempts = writer.failed_attempts
             self.store.save(project)
             return project
         if step in RENDER_STEPS:
@@ -96,20 +101,40 @@ class Pipeline:
         raise ValueError(f"Unknown step {step!r}. Steps: {', '.join(STEPS)}")
 
     def run_all(self, project_id: str, progress: Callable[[str], None] | None = None, **kw) -> Path:
-        """Write and render whatever is missing, then build the format's export."""
+        """Write and render whatever is missing, then build the format's export.
+        Writes a timing/memory report to <project>/run_report.json."""
         project = self.store.load(project_id)
         status = project.status()
-        for step in WRITE_STEPS + RENDER_STEPS:
-            if not status[step]:
-                if progress:
-                    progress(step)
-                self.run(project_id, step, **kw)
-                # Later steps depend on the earlier ones, so rerun them all.
-                status = {k: (False if k in STEPS[STEPS.index(step) + 1 :] else v) for k, v in status.items()}
-        export = DEFAULT_EXPORT[project.format]
-        if progress:
-            progress(export)
-        return self.run(project_id, export)
+        steps = [s for s in WRITE_STEPS + RENDER_STEPS if not status[s]]
+        # Earlier steps invalidate later ones, so run everything after the first gap.
+        if steps:
+            steps = list(WRITE_STEPS + RENDER_STEPS)[list(WRITE_STEPS + RENDER_STEPS).index(steps[0]) :]
+        steps.append(DEFAULT_EXPORT[project.format])
+        report = {"project": project_id, "profile": self.profile.name, "steps": []}
+        started = time.time()
+        peak_memory_gb()  # reset the peak counter
+        result: Path | Project = project
+        for step in steps:
+            if progress:
+                progress(step)
+            t = time.time()
+            result = self.run(project_id, step, **kw)
+            entry = {"step": step, "seconds": round(time.time() - t, 1), "peak_gb": _round(peak_memory_gb())}
+            if step in WRITE_STEPS:
+                entry["writer_retries"] = self.last_failed_attempts
+            done = self.store.load(project_id)
+            if step == "images":
+                entry["count"] = len(done.shots)
+            elif step == "portraits":
+                entry["count"] = len(done.bible.characters)
+            report["steps"].append(entry)
+        report["total_seconds"] = round(time.time() - started, 1)
+        (self.store.root(project_id) / "run_report.json").write_text(json.dumps(report, indent=2))
+        self.last_report = report
+        return result
+
+def _round(value: float | None) -> float | None:
+    return round(value, 1) if value is not None else None
 
 
 def _require(project: Project, step: str) -> None:

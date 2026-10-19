@@ -166,3 +166,16 @@ def test_reroll_gives_a_shot_a_new_take(store, pipeline):
     pipeline.run(project.id, "images", only={shot.id}, reroll=True)
     assert store.load(project.id).shots[0].seed_offset == 1
     assert (root / shot.image).read_bytes() != before
+
+
+def test_run_all_writes_a_report(store, pipeline):
+    import json
+
+    project = store.create("Lighthouse", "premise", "comic")
+    pipeline.run_all(project.id, n_scenes=2, n_shots=3)
+    report = json.loads((store.root(project.id) / "run_report.json").read_text())
+    assert [s["step"] for s in report["steps"]] == ["bible", "outline", "shots", "portraits", "images", "comic"]
+    images = next(s for s in report["steps"] if s["step"] == "images")
+    assert images["count"] == 6
+    assert all("writer_retries" in s for s in report["steps"][:3])
+    assert report["total_seconds"] >= 0

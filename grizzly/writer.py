@@ -23,6 +23,8 @@ class Writer:
         self.llm = llm
         self.profile = profile
         self.retries = retries
+        # Invalid replies that needed another attempt; a reliability signal.
+        self.failed_attempts = 0
 
     def _ask(self, system: str, user: str, model: type[T], fix: Callable[[dict], dict] = lambda d: d) -> T:
         messages: list[Message] = [{"role": "system", "content": system}, {"role": "user", "content": user}]
@@ -33,6 +35,7 @@ class Writer:
                 return model.model_validate(fix(extract_json(raw)))
             except (ValueError, ValidationError) as exc:
                 error = str(exc)
+                self.failed_attempts += 1
                 log.warning("Attempt %d produced invalid %s: %s", attempt, model.__name__, error[:300])
                 # Show the model its own output and the error, and ask again.
                 messages = messages[:2] + [

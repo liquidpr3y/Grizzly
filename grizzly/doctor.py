@@ -11,7 +11,7 @@ from pathlib import Path
 
 from grizzly.config import Profile
 from grizzly.jsonutil import extract_json
-from grizzly.memory import release_accelerator_memory
+from grizzly.memory import peak_memory_gb, release_accelerator_memory
 
 
 def _ok(label: str, detail: str = "") -> None:
@@ -25,18 +25,8 @@ def _fail(label: str, exc: BaseException, verbose: bool) -> None:
 
 
 def _peak_gb() -> str:
-    try:
-        import mlx.core as mx
-    except ImportError:
-        return ""
-    get = getattr(mx, "get_peak_memory", None) or getattr(getattr(mx, "metal", None), "get_peak_memory", None)
-    reset = getattr(mx, "reset_peak_memory", None) or getattr(getattr(mx, "metal", None), "reset_peak_memory", None)
-    if not get:
-        return ""
-    peak = get() / 1e9
-    if reset:
-        reset()
-    return f"peak {peak:.1f}GB"
+    peak = peak_memory_gb()
+    return f"peak {peak:.1f}GB" if peak is not None else ""
 
 
 def run_doctor(

@@ -84,11 +84,22 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Done {args.step} in {time.time() - start:.0f}s -> {where}")
     elif args.cmd == "run":
         start = time.time()
-        out = Pipeline(profile, store).run_all(
+        pipeline = Pipeline(profile, store)
+        out = pipeline.run_all(
             args.project, progress=lambda s: print(f"== {s}", flush=True),
             n_scenes=args.scenes, n_shots=args.shots,
         )
         print(f"Done in {time.time() - start:.0f}s -> {out}")
+        print(f"\n{'step':10} {'time':>8} {'peak GPU':>9}  notes")
+        for e in pipeline.last_report["steps"]:
+            notes = []
+            if "count" in e:
+                notes.append(f"{e['count']} items, {e['seconds'] / max(e['count'], 1):.1f}s each")
+            if e.get("writer_retries"):
+                notes.append(f"{e['writer_retries']} writer retries")
+            peak = f"{e['peak_gb']}GB" if e["peak_gb"] is not None else "-"
+            print(f"{e['step']:10} {e['seconds']:>7.1f}s {peak:>9}  {', '.join(notes)}")
+        print(f"Report: {store.root(args.project) / 'run_report.json'}")
     elif args.cmd == "doctor":
         from grizzly.doctor import run_doctor
 

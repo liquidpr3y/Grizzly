@@ -29,6 +29,22 @@ def release_accelerator_memory() -> None:
         clear()
 
 
+def peak_memory_gb(reset: bool = True) -> float | None:
+    """Peak MLX (GPU) memory since the last reset, or None without MLX."""
+    try:
+        import mlx.core as mx
+    except ImportError:
+        return None
+    get = getattr(mx, "get_peak_memory", None) or getattr(getattr(mx, "metal", None), "get_peak_memory", None)
+    clear = getattr(mx, "reset_peak_memory", None) or getattr(getattr(mx, "metal", None), "reset_peak_memory", None)
+    if not get:
+        return None
+    peak = get() / 1e9
+    if reset and clear:
+        clear()
+    return peak
+
+
 class ModelManager:
     def __init__(self, swap: bool = True) -> None:
         self.swap = swap
