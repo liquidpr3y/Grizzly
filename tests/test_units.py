@@ -94,6 +94,10 @@ def test_shot_prompt_adds_unlisted_characters_and_head_count():
     prompt = shot_prompt(bible, shot)
     assert "black cat, monocle" in prompt and "powdered wig" in prompt
     assert "red cloak" not in prompt  # "Mrs." alone must not match
-    assert "each appear exactly once" in prompt
+    assert "exactly 2 main figures (Whiskers and Lord Bumblewick)" in prompt
     solo = shot_prompt(bible, Shot(id="b", scene_id="s", action="a cat on a wall", character_ids=["whiskers"]))
-    assert "only one Whiskers in the image" in solo
+    assert "exactly one main figure (Whiskers)" in solo
+    empty = shot_prompt(bible, Shot(id="c", scene_id="s", action="a hand drops a key into a crate"))
+    assert "no main characters in frame" in empty
+    wide = shot_prompt(bible, Shot(id="d", scene_id="s", action="x", framing="wide", character_ids=["whiskers"]))
+    assert "full bodies" not in wide

@@ -19,11 +19,11 @@ Reply with ONLY a JSON object of this exact shape:
   "logline": "one sentence",
   "genre": "string",
   "tone": "string",
-  "art_style": "a precise visual art direction for an image generator, e.g. 'ink and watercolour comic art, bold linework, muted palette'",
+  "art_style": "medium, technique and palette ONLY, e.g. 'ink and watercolour comic art, bold linework, muted palette'. Never mention characters, animals, species or places here: this text is added to every image",
   "characters": [
     {{"id": "short_snake_case", "name": "string", "role": "protagonist/antagonist/...",
       "personality": "string",
-      "appearance": "fixed visual description used in every illustration: age, build, face, hair, clothing, colours, one distinctive feature"}}
+      "appearance": "fixed visual description used in every illustration, starting with what they are (species if not human): age, build, face, hair or fur, clothing, colours, one distinctive feature"}}
   ],
   "locations": [
     {{"id": "short_snake_case", "name": "string", "description": "visual description: setting, lighting, key props"}}

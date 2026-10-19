@@ -21,7 +21,7 @@ from grizzly.models import Character, Project, Shot, StoryBible
 log = logging.getLogger(__name__)
 
 FRAMING_PHRASES = {
-    "wide": "wide establishing shot, full bodies, environment visible",
+    "wide": "wide establishing shot, full figure visible, environment visible",
     "medium": "medium shot from the waist up",
     "close-up": "close-up on the face, expressive detail",
 }
@@ -64,11 +64,15 @@ def shot_prompt(bible: StoryBible, shot: Shot, film: bool = False) -> str:
     cast = shot_cast(bible, shot)
     for c in cast:
         parts.append(f"{c.name}: {c.appearance}")
-    if cast:
-        # Diffusion models tend to duplicate a described character in wide
-        # shots; state the head count explicitly.
+    # Diffusion models duplicate characters in wide shots and invent them in
+    # empty ones. They don't know character names, so give a numeric count.
+    if not cast:
+        parts.append("no main characters in frame")
+    elif len(cast) == 1:
+        parts.append(f"exactly one main figure ({cast[0].name}), appearing only once, no duplicates")
+    else:
         names = " and ".join(c.name for c in cast)
-        parts.append(f"{names} each appear exactly once" if len(cast) > 1 else f"only one {cast[0].name} in the image")
+        parts.append(f"exactly {len(cast)} main figures ({names}), each appearing only once, no duplicates")
     loc = bible.location(shot.location_id) if shot.location_id else None
     if loc:
         parts.append(f"Setting: {loc.description}")
