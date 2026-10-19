@@ -44,10 +44,10 @@ class Writer:
                 ]
         raise RuntimeError(f"Writer could not produce a valid {model.__name__}: {error}")
 
-    def bible(self, project: Project, n_characters: int = 3, n_locations: int = 3) -> StoryBible:
+    def bible(self, project: Project, n_characters: int | None = None, n_locations: int = 3) -> StoryBible:
         system = prompts.BIBLE_SYSTEM.format(
             format_note=prompts.FORMAT_NOTES[project.format],
-            n_characters=n_characters,
+            n_characters=prompts.character_count(n_characters),
             n_locations=n_locations,
         )
         def fix(data: dict) -> dict:

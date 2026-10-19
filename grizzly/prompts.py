@@ -29,7 +29,7 @@ Reply with ONLY a JSON object of this exact shape:
     {{"id": "short_snake_case", "name": "string", "description": "visual description: setting, lighting, key props"}}
   ]
 }}
-Create {n_characters} characters and {n_locations} locations. Appearance must be concrete and visual, not personality."""
+Create {n_characters} and {n_locations} locations. Appearance must be concrete and visual, not personality."""
 
 OUTLINE_SYSTEM = """TASK: outline
 You are a story editor. Break the story into exactly {n_scenes} scenes with a clear beginning, middle and end.
@@ -48,6 +48,14 @@ Break the scene into exactly {n_shots} shots. For each shot:
 - "dialogue": spoken lines in this shot, [{{"speaker": "character id", "text": "..."}}], may be empty
 - "narration": caption / voice-over text, may be empty
 Reply with ONLY a JSON object: {{"shots": [{{"framing": "...", "action": "...", "character_ids": [], "dialogue": [], "narration": ""}}]}}"""
+
+
+def character_count(n: int | None) -> str:
+    if n:
+        return f"exactly {n} characters"
+    # Let the premise decide, but never drop a role it names (the heist
+    # premise named a sky-pirate captain who then never appeared).
+    return "as many characters as the premise needs (2 to 5), including every role it names, such as villains"
 
 
 def bible_user(premise: str) -> str:

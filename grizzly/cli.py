@@ -42,7 +42,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--reroll", action="store_true", help="draw the --only shots or portraits again with a fresh seed")
     p.add_argument("--scenes", type=int, default=4)
     p.add_argument("--shots", type=int, default=4, help="shots per scene")
-    p.add_argument("--characters", type=int, default=3)
+    p.add_argument("--characters", type=int, default=None, help="default: as many as the premise needs")
     p.add_argument("--locations", type=int, default=3)
 
     p = sub.add_parser("run", help="write, render and export everything that is missing")

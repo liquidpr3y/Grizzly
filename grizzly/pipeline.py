@@ -49,7 +49,7 @@ class Pipeline:
         only: set[str] | None = None,
         n_scenes: int = 4,
         n_shots: int = 4,
-        n_characters: int = 3,
+        n_characters: int | None = None,
         n_locations: int = 3,
         progress: Progress | None = None,
         reroll: bool = False,

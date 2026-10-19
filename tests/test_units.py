@@ -138,3 +138,24 @@ def test_flux2_backend_switches_variant_by_references(monkeypatch, tmp_path):
     model.generate("c", 1, 64, 64, refs=[])
     assert loads == ["Flux2KleinEdit", "Flux2Klein"]
     assert calls == [("Flux2KleinEdit", [str(ref)]), ("Flux2KleinEdit", [str(ref)]), ("Flux2Klein", None)]
+
+
+def test_cast_size_follows_the_premise_unless_fixed():
+    from grizzly.prompts import character_count
+
+    assert character_count(4) == "exactly 4 characters"
+    assert "every role it names" in character_count(None)
+
+
+def test_reference_shots_warn_against_duplicates():
+    from grizzly.models import Character, Location, StoryBible
+    from grizzly.visuals import shot_prompt
+
+    bible = StoryBible(
+        title="t", logline="l", art_style="ink",
+        characters=[Character(id="a", name="Ann", appearance="red coat"), Character(id="b", name="Ben", appearance="goggles")],
+        locations=[Location(id="x", name="X", description="deck")],
+    )
+    shot = Shot(id="s", scene_id="s", action="Ann and Ben on deck", character_ids=["a", "b"], framing="wide")
+    assert "never two copies" in shot_prompt(bible, shot, ref_ids=["a", "b"])
+    assert "never two copies" not in shot_prompt(bible, shot)

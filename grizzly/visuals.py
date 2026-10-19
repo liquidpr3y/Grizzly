@@ -85,6 +85,13 @@ def shot_prompt(bible: StoryBible, shot: Shot, film: bool = False, ref_ids: list
     else:
         names = " and ".join(c.name for c in cast)
         parts.append(f"exactly {len(cast)} main figures ({names}), each appearing only once, no duplicates")
+    if ref_ids:
+        # With several references the model sometimes draws one character
+        # twice (Kyler appeared twice in 3 of 16 heist panels).
+        parts.append(
+            "each reference image shows one different character; draw every one of them exactly once, "
+            "never two copies of the same person"
+        )
     loc = bible.location(shot.location_id) if shot.location_id else None
     if loc:
         parts.append(f"Setting: {loc.description}")

@@ -40,7 +40,7 @@ class StepRequest(BaseModel):
     only: list[str] | None = None
     scenes: int = 4
     shots: int = 4
-    characters: int = 3
+    characters: int | None = None
     locations: int = 3
     reroll: bool = False
 
