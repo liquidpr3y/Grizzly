@@ -49,6 +49,7 @@ class Pipeline:
         n_characters: int = 3,
         n_locations: int = 3,
         progress: Progress | None = None,
+        reroll: bool = False,
     ) -> Project | Path:
         project = self.store.load(project_id)
         root = self.store.root(project_id)
@@ -72,7 +73,10 @@ class Pipeline:
             # Shots drawn from references need every portrait first.
             if step == "portraits" or (use_refs and not project.status()["portraits"]):
                 model = self.models.acquire("image")
-                render_portraits(project, root, model, self.profile, force and step == "portraits", progress)
+                if step == "portraits":
+                    render_portraits(project, root, model, self.profile, force, progress, only=only, reroll=reroll)
+                else:
+                    render_portraits(project, root, model, self.profile, progress=progress)
                 self.store.save(project)
             if step == "images":
                 model = self.models.acquire("ref_image" if use_refs else "image")

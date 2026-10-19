@@ -38,7 +38,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("project")
     p.add_argument("step", choices=STEPS)
     p.add_argument("--force", action="store_true", help="re-render images that already exist")
-    p.add_argument("--only", nargs="+", metavar="SHOT_ID", help="only re-render these shots")
+    p.add_argument("--only", nargs="+", metavar="ID", help="only re-render these shots (images) or characters (portraits)")
+    p.add_argument("--reroll", action="store_true", help="portraits: draw with a fresh seed")
     p.add_argument("--scenes", type=int, default=4)
     p.add_argument("--shots", type=int, default=4, help="shots per scene")
     p.add_argument("--characters", type=int, default=3)
@@ -77,7 +78,7 @@ def main(argv: list[str] | None = None) -> int:
         result = Pipeline(profile, store).run(
             args.project, args.step, force=args.force, only=set(args.only) if args.only else None,
             n_scenes=args.scenes, n_shots=args.shots, n_characters=args.characters,
-            n_locations=args.locations, progress=_progress,
+            n_locations=args.locations, progress=_progress, reroll=args.reroll,
         )
         where = result if not hasattr(result, "id") else store.root(args.project) / "project.json"
         print(f"Done {args.step} in {time.time() - start:.0f}s -> {where}")

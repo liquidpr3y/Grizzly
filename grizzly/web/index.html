@@ -166,6 +166,7 @@ function bibleView(b) {
       $("div", { class: "meta" }, c.personality),
       $("label", { class: "meta" }, "Appearance (used in every image)", editable(c, "appearance")),
       $("label", { class: "meta" }, "macOS voice", $("input", { value: c.voice || "", placeholder: "e.g. Daniel", oninput: e => { c.voice = e.target.value; } })),
+      $("button", { onclick: async () => { await save(); runStep("portraits", { only: [c.id], reroll: true }); } }, "Save + new portrait"),
     ))),
     $("h3", {}, "Locations"),
     $("div", { class: "cards" }, ...b.locations.map(l => $("div", { class: "card" }, $("b", {}, l.name), editable(l, "description")))),

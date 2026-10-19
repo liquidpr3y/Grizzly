@@ -103,3 +103,53 @@ def test_refs_can_be_switched_off(store, monkeypatch):
     project = store.create("Lighthouse", "premise", "comic")
     pipeline.run_all(project.id, n_scenes=1, n_shots=2)
     assert all(not c["refs"] for c in pipeline.models.acquire("image").calls)
+
+
+def test_reroll_redraws_one_portrait_with_a_new_seed(store, pipeline):
+    project = store.create("Lighthouse", "premise", "comic")
+    pipeline.run(project.id, "bible")
+    pipeline.run(project.id, "portraits")
+    root = store.root(project.id)
+    before = {c.id: (root / c.portrait).read_bytes() for c in store.load(project.id).bible.characters}
+    pipeline.run(project.id, "portraits", only={"mara"}, reroll=True)
+    after = store.load(project.id).bible
+    assert after.character("mara").portrait_seed == 1
+    assert (root / after.character("mara").portrait).read_bytes() != before["mara"]
+    assert (root / after.character("old_tom").portrait).read_bytes() == before["old_tom"]
+
+
+def test_shots_with_references_render_first(store, pipeline):
+    project = store.create("Lighthouse", "premise", "comic")
+    for step in ("bible", "outline", "shots"):
+        pipeline.run(project.id, step, n_scenes=1, n_shots=3)
+    data = store.load(project.id)
+    data.shots[0].character_ids = []
+    data.shots[0].action = "a gull on a railing"
+    store.save(data)
+    pipeline.run(project.id, "images")
+    calls = pipeline.models.acquire("ref_image").calls
+    assert [bool(c["refs"]) for c in calls] == [True, True, False]
+
+
+def test_failed_shot_clears_its_image_and_blocks_export(store, pipeline):
+    project = store.create("Lighthouse", "premise", "comic")
+    pipeline.run_all(project.id, n_scenes=1, n_shots=3)
+    model = pipeline.models.acquire("ref_image")
+    original = model.generate
+
+    def flaky(prompt, seed, w, h, refs=None):
+        if not refs:
+            raise RuntimeError("boom")
+        return original(prompt, seed, w, h, refs)
+
+    model.generate = flaky
+    data = store.load(project.id)
+    data.shots[0].character_ids = []
+    data.shots[0].action = "a gull on a railing"
+    store.save(data)
+    with pytest.raises(RuntimeError, match="1 shot\\(s\\) failed"):
+        pipeline.run(project.id, "images", force=True)
+    after = store.load(project.id)
+    assert after.shots[0].image is None and all(s.image for s in after.shots[1:])
+    with pytest.raises(RuntimeError, match="needs images"):
+        pipeline.run(project.id, "comic")

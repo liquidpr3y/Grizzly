@@ -101,3 +101,40 @@ def test_shot_prompt_adds_unlisted_characters_and_head_count():
     assert "no main characters in frame" in empty
     wide = shot_prompt(bible, Shot(id="d", scene_id="s", action="x", framing="wide", character_ids=["whiskers"]))
     assert "full bodies" not in wide
+
+
+def test_flux2_backend_switches_variant_by_references(monkeypatch, tmp_path):
+    """Exercise the real backend class against a fake mflux, since mflux's
+    edit variant crashes without references (it concatenates None)."""
+    import sys
+    import types
+
+    from PIL import Image
+
+    loads, calls = [], []
+
+    class FakeModel:
+        def __init__(self, model_config, model_path):
+            loads.append(type(self).__name__)
+
+        def generate_image(self, **kw):
+            calls.append((type(self).__name__, kw.get("image_paths")))
+            return types.SimpleNamespace(image=Image.new("RGB", (8, 8)))
+
+    variants = types.ModuleType("mflux.models.flux2.variants")
+    variants.Flux2KleinEdit = type("Flux2KleinEdit", (FakeModel,), {})
+    variants.Flux2Klein = type("Flux2Klein", (FakeModel,), {})
+    config = types.ModuleType("mflux.models.common.config")
+    config.ModelConfig = types.SimpleNamespace(flux2_klein_4b=lambda: "cfg")
+    monkeypatch.setitem(sys.modules, "mflux.models.flux2.variants", variants)
+    monkeypatch.setitem(sys.modules, "mflux.models.common.config", config)
+
+    from grizzly.image.mflux_flux2_backend import MfluxFlux2RefModel
+
+    model = MfluxFlux2RefModel("repo", 4)
+    ref = tmp_path / "r.png"
+    model.generate("a", 1, 64, 64, refs=[ref])
+    model.generate("b", 1, 64, 64, refs=[ref])
+    model.generate("c", 1, 64, 64, refs=[])
+    assert loads == ["Flux2KleinEdit", "Flux2Klein"]
+    assert calls == [("Flux2KleinEdit", [str(ref)]), ("Flux2KleinEdit", [str(ref)]), ("Flux2Klein", None)]

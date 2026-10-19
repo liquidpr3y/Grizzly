@@ -110,5 +110,5 @@ def _resolve_characters(bible: StoryBible, refs: list) -> list[str]:
 
 
 def _bible_json(bible: StoryBible) -> str:
-    data = bible.model_dump(exclude={"characters": {"__all__": {"portrait", "voice"}}})
+    data = bible.model_dump(exclude={"characters": {"__all__": {"portrait", "voice", "portrait_seed"}}})
     return json.dumps(data, ensure_ascii=False)

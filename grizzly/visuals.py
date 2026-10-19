@@ -105,17 +105,31 @@ def shot_size(profile: Profile, project: Project, shot: Shot) -> tuple[int, int]
 Progress = Callable[[int, int, str], None]
 
 
-def render_portraits(project: Project, root: Path, model: ImageModel, profile: Profile, force: bool = False, progress: Progress | None = None) -> None:
+def render_portraits(
+    project: Project,
+    root: Path,
+    model: ImageModel,
+    profile: Profile,
+    force: bool = False,
+    progress: Progress | None = None,
+    only: set[str] | None = None,
+    reroll: bool = False,
+) -> None:
+    """Draw missing portraits. `only` limits to those character ids (and
+    re-draws them); `reroll` also moves them to a fresh seed."""
     out = root / "images" / "characters"
     out.mkdir(parents=True, exist_ok=True)
-    chars = project.bible.characters
+    chars = [c for c in project.bible.characters if only is None or c.id in only]
     for i, c in enumerate(chars):
-        if c.portrait and (root / c.portrait).exists() and not force:
+        if reroll:
+            c.portrait_seed += 1
+        if c.portrait and (root / c.portrait).exists() and not (force or only or reroll):
             continue
         if progress:
             progress(i, len(chars), f"portrait {c.name}")
         w, h = profile.sizes["portrait"]
-        img = model.generate(portrait_prompt(project.bible, c), stable_seed(project, c.id), w, h)
+        key = c.id if not c.portrait_seed else f"{c.id}:{c.portrait_seed}"
+        img = model.generate(portrait_prompt(project.bible, c), stable_seed(project, key), w, h)
         path = out / f"{c.id}.png"
         img.save(path)
         c.portrait = str(path.relative_to(root))
@@ -157,16 +171,31 @@ def render_shots(
         for s in project.shots
         if (only is None or s.id in only) and (force or only is not None or not (s.image and (root / s.image).exists()))
     ]
-    for i, shot in enumerate(todo):
+    plan = [(s, reference_images(project, root, profile, s) if use_refs else []) for s in todo]
+    # Shots with references first: the reference backend swaps variants
+    # between with- and without-reference shots, so group them.
+    plan.sort(key=lambda item: not item[1])
+    failed: list[tuple[str, Exception]] = []
+    for i, (shot, refs) in enumerate(plan):
         if progress:
-            progress(i, len(todo), f"shot {shot.id}")
+            progress(i, len(plan), f"shot {shot.id}")
         w, h = shot_size(profile, project, shot)
-        refs = reference_images(project, root, profile, shot) if use_refs else []
         prompt = shot_prompt(project.bible, shot, film=project.format != "comic", ref_ids=[cid for cid, _ in refs])
         log.info("Rendering %s (%dx%d, %d refs): %s", shot.id, w, h, len(refs), prompt[:160])
-        img = model.generate(prompt, stable_seed(project, shot.id), w, h, refs=[p for _, p in refs])
-        path = out / f"{shot.id}.png"
-        img.save(path)
-        shot.image = str(path.relative_to(root))
+        try:
+            img = model.generate(prompt, stable_seed(project, shot.id), w, h, refs=[p for _, p in refs])
+        except Exception as exc:
+            # Keep going, but drop the stale image so exports can't silently
+            # use the previous version of this shot.
+            log.error("Shot %s failed: %s", shot.id, exc, exc_info=True)
+            failed.append((shot.id, exc))
+            shot.image = None
+        else:
+            path = out / f"{shot.id}.png"
+            img.save(path)
+            shot.image = str(path.relative_to(root))
         if on_each:
             on_each()
+    if failed:
+        ids = ", ".join(sid for sid, _ in failed)
+        raise RuntimeError(f"{len(failed)} shot(s) failed ({ids}); first error: {failed[0][1]!r}")

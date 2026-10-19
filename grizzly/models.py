@@ -28,6 +28,9 @@ class Character(BaseModel):
     # macOS `say` voice for animatic narration, e.g. "Daniel". Empty = default.
     voice: str = ""
     portrait: str | None = None
+    # Bumped to re-draw ("reroll") the portrait with a fresh seed. The portrait
+    # is the reference every shot copies, so it is worth getting right.
+    portrait_seed: int = 0
 
     @field_validator("id", mode="before")
     @classmethod

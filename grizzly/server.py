@@ -42,6 +42,7 @@ class StepRequest(BaseModel):
     shots: int = 4
     characters: int = 3
     locations: int = 3
+    reroll: bool = False
 
 
 class Jobs:
@@ -72,7 +73,8 @@ class Jobs:
                 else:
                     out = self.pipeline.run(
                         job["project"], job["step"], force=req.force, only=set(req.only) if req.only else None,
-                        n_characters=req.characters, n_locations=req.locations, progress=progress, **kw,
+                        n_characters=req.characters, n_locations=req.locations, progress=progress,
+                        reroll=req.reroll, **kw,
                     )
                 if isinstance(out, Path):
                     job["result"] = str(out.relative_to(self.pipeline.store.root(job["project"])))
