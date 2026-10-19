@@ -82,7 +82,7 @@ class Pipeline:
                 model = self.models.acquire("ref_image" if use_refs else "image")
                 render_shots(
                     project, root, model, self.profile, force, only, progress,
-                    on_each=lambda: self.store.save(project), use_refs=use_refs,
+                    on_each=lambda: self.store.save(project), use_refs=use_refs, reroll=reroll,
                 )
                 self.store.save(project)
             return project

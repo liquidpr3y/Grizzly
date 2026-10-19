@@ -103,6 +103,8 @@ class Shot(BaseModel):
     narration: str = ""
     duration: float = 4.0
     image: str | None = None
+    # Bumped to re-draw ("reroll") the shot with a fresh seed.
+    seed_offset: int = 0
 
     @field_validator("framing", mode="before")
     @classmethod

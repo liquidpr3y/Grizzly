@@ -74,7 +74,7 @@ Other profiles: `m5pro-24gb-ollama` (the writer runs in an existing Ollama insta
 1. **Text.** Each prompt repeats the global art style, the fixed `appearance` text of every visible character, the location description and an explicit head count. Seeds are derived from stable ids, so a re-render is reproducible.
 2. **Reference images.** Z-Image draws one full-body portrait per character (`images/characters/`). FLUX.2 Klein then draws every shot with the portraits of up to three characters in frame as reference images (downscaled copies in `images/refs/`). The prompt names which image shows whom. This pins down details that text alone drifts on, such as a monocle turning into glasses.
 
-The portrait is what every shot copies, so check `images/characters/` before rendering shots. To re-draw one character's portrait with a fresh seed, run `grizzly step <id> portraits --only <character_id> --reroll`, or click **Save + new portrait** in the studio. If the model keeps getting a detail wrong, sharpen their appearance text first. Then run `grizzly step <id> images --force`.
+The portrait is what every shot copies, so check `images/characters/` before rendering shots. To re-draw one character's portrait with a fresh seed, run `grizzly step <id> portraits --only <character_id> --reroll`, or click **Save + new portrait** in the studio. Shots work the same way: `grizzly step <id> images --only <shot_id> --reroll`, or **New take**. If the model keeps getting a detail wrong, sharpen their appearance text first. Then run `grizzly step <id> images --force`.
 
 ## Roadmap
 

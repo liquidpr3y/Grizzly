@@ -163,6 +163,7 @@ def render_shots(
     progress: Progress | None = None,
     on_each: Callable[[], None] | None = None,
     use_refs: bool = False,
+    reroll: bool = False,
 ) -> None:
     out = root / "images" / "shots"
     out.mkdir(parents=True, exist_ok=True)
@@ -179,11 +180,14 @@ def render_shots(
     for i, (shot, refs) in enumerate(plan):
         if progress:
             progress(i, len(plan), f"shot {shot.id}")
+        if reroll:
+            shot.seed_offset += 1
         w, h = shot_size(profile, project, shot)
         prompt = shot_prompt(project.bible, shot, film=project.format != "comic", ref_ids=[cid for cid, _ in refs])
         log.info("Rendering %s (%dx%d, %d refs): %s", shot.id, w, h, len(refs), prompt[:160])
+        key = shot.id if not shot.seed_offset else f"{shot.id}:{shot.seed_offset}"
         try:
-            img = model.generate(prompt, stable_seed(project, shot.id), w, h, refs=[p for _, p in refs])
+            img = model.generate(prompt, stable_seed(project, key), w, h, refs=[p for _, p in refs])
         except Exception as exc:
             # Keep going, but drop the stale image so exports can't silently
             # use the previous version of this shot.

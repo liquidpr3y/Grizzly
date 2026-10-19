@@ -153,3 +153,16 @@ def test_failed_shot_clears_its_image_and_blocks_export(store, pipeline):
     assert after.shots[0].image is None and all(s.image for s in after.shots[1:])
     with pytest.raises(RuntimeError, match="needs images"):
         pipeline.run(project.id, "comic")
+
+
+def test_reroll_gives_a_shot_a_new_take(store, pipeline):
+    project = store.create("Lighthouse", "premise", "comic")
+    pipeline.run_all(project.id, n_scenes=1, n_shots=2)
+    shot = store.load(project.id).shots[0]
+    root = store.root(project.id)
+    before = (root / shot.image).read_bytes()
+    pipeline.run(project.id, "images", only={shot.id})
+    assert (root / shot.image).read_bytes() == before  # same seed, same take
+    pipeline.run(project.id, "images", only={shot.id}, reroll=True)
+    assert store.load(project.id).shots[0].seed_offset == 1
+    assert (root / shot.image).read_bytes() != before

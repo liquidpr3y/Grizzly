@@ -185,7 +185,9 @@ function shotsView(p) {
       editable(s, "action"),
       s.narration ? $("div", { class: "line" }, $("i", {}, s.narration)) : null,
       ...s.dialogue.map(d => $("div", { class: "line" }, $("b", {}, name(d.speaker) + ": "), d.text)),
-      $("button", { onclick: async () => { await save(); runStep("images", { only: [s.id] }); } }, "Save + re-render"),
+      $("div", { class: "steps" },
+        $("button", { onclick: async () => { await save(); runStep("images", { only: [s.id] }); } }, "Save + re-render"),
+        $("button", { onclick: async () => { await save(); runStep("images", { only: [s.id], reroll: true }); } }, "New take")),
     ))),
   );
 }

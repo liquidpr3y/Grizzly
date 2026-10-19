@@ -39,7 +39,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("step", choices=STEPS)
     p.add_argument("--force", action="store_true", help="re-render images that already exist")
     p.add_argument("--only", nargs="+", metavar="ID", help="only re-render these shots (images) or characters (portraits)")
-    p.add_argument("--reroll", action="store_true", help="portraits: draw with a fresh seed")
+    p.add_argument("--reroll", action="store_true", help="draw the --only shots or portraits again with a fresh seed")
     p.add_argument("--scenes", type=int, default=4)
     p.add_argument("--shots", type=int, default=4, help="shots per scene")
     p.add_argument("--characters", type=int, default=3)
