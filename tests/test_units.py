@@ -66,3 +66,34 @@ def test_doctor_with_mock_profile(tmp_path):
 def test_pillow_typing_module_imports():
     # mflux imports PIL._typing at runtime; Pillow 13.0 fails there on Python <3.15.
     import PIL._typing  # noqa: F401
+
+
+def test_paginate_balances_rows():
+    from grizzly.render.comic import _paginate
+
+    assert [len(p) for p in _paginate(list(range(4)))] == [2, 2]
+    assert [len(p) for p in _paginate(list(range(5)))] == [3, 2]
+    assert [len(p) for p in _paginate(list(range(6)))] == [3, 3]
+    assert [len(p) for p in _paginate(list(range(7)))] == [3, 2, 2]
+
+
+def test_shot_prompt_adds_unlisted_characters_and_head_count():
+    from grizzly.models import Character, Location, StoryBible
+    from grizzly.visuals import shot_prompt
+
+    bible = StoryBible(
+        title="t", logline="l", art_style="ink",
+        characters=[
+            Character(id="whiskers", name="Whiskers", appearance="black cat, monocle"),
+            Character(id="pudding", name="Mrs. Pudding", appearance="red cloak"),
+            Character(id="bumble", name="Lord Bumblewick", appearance="powdered wig"),
+        ],
+        locations=[Location(id="market", name="Market", description="stalls")],
+    )
+    shot = Shot(id="a", scene_id="s", action="Whiskers inspects the key while Bumblewick watches", character_ids=[])
+    prompt = shot_prompt(bible, shot)
+    assert "black cat, monocle" in prompt and "powdered wig" in prompt
+    assert "red cloak" not in prompt  # "Mrs." alone must not match
+    assert "each appear exactly once" in prompt
+    solo = shot_prompt(bible, Shot(id="b", scene_id="s", action="a cat on a wall", character_ids=["whiskers"]))
+    assert "only one Whiskers in the image" in solo

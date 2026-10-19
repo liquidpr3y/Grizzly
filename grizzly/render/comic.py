@@ -35,6 +35,21 @@ def _rows(shots: list[Shot]) -> list[list[Shot]]:
     return rows
 
 
+def _paginate(rows: list[list[Shot]]) -> list[list[list[Shot]]]:
+    """Spread rows evenly over the fewest pages, so no page is left half empty
+    (5 rows -> 3 + 2, each page's rows stretched to fill it)."""
+    if not rows:
+        return []
+    n_pages = -(-len(rows) // ROWS_PER_PAGE)
+    base, extra = divmod(len(rows), n_pages)
+    pages, i = [], 0
+    for p in range(n_pages):
+        take = base + (1 if p < extra else 0)
+        pages.append(rows[i : i + take])
+        i += take
+    return pages
+
+
 def _wrap(draw: ImageDraw.ImageDraw, text: str, fnt, max_w: int) -> list[str]:
     lines, line = [], ""
     for word in text.split():
@@ -126,11 +141,10 @@ def build_comic(project: Project, root: Path) -> Path:
     out = root / "exports" / "comic"
     out.mkdir(parents=True, exist_ok=True)
     pages = [_cover(project, root)]
-    rows = _rows(project.shots)
-    row_h = (PAGE_H - 2 * MARGIN - GUTTER * (ROWS_PER_PAGE - 1)) // ROWS_PER_PAGE
-    for start in range(0, len(rows), ROWS_PER_PAGE):
+    for page_rows in _paginate(_rows(project.shots)):
         page = Image.new("RGB", (PAGE_W, PAGE_H), "white")
-        for r, row in enumerate(rows[start : start + ROWS_PER_PAGE]):
+        row_h = (PAGE_H - 2 * MARGIN - GUTTER * (len(page_rows) - 1)) // len(page_rows)
+        for r, row in enumerate(page_rows):
             y0 = MARGIN + r * (row_h + GUTTER)
             col_w = (PAGE_W - 2 * MARGIN - GUTTER * (len(row) - 1)) // len(row)
             for c, shot in enumerate(row):

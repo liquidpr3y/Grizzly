@@ -9,6 +9,7 @@ per-character LoRAs and reference-image conditioning.
 from __future__ import annotations
 
 import logging
+import re
 import zlib
 from pathlib import Path
 from typing import Callable
@@ -38,11 +39,36 @@ def portrait_prompt(bible: StoryBible, c: Character) -> str:
     )
 
 
+_TITLES = {"mr", "mrs", "ms", "miss", "lord", "lady", "sir", "dr", "doctor", "captain", "the", "old", "young"}
+
+
+def _mentions(text: str, c: Character) -> bool:
+    words = set(re.findall(r"[a-z0-9']+", text.lower()))
+    names = [w for w in re.findall(r"[a-z0-9']+", c.name.lower()) if w not in _TITLES and len(w) >= 3]
+    return c.name.lower() in text.lower() or any(n in words for n in names)
+
+
+def shot_cast(bible: StoryBible, shot: Shot) -> list[Character]:
+    """Characters listed for the shot, plus any the action describes but the
+    writer forgot to list. Without this their appearance text is missing and
+    the model invents a different-looking character."""
+    cast = [c for c in (bible.character(cid) for cid in shot.character_ids) if c]
+    for c in bible.characters:
+        if c not in cast and _mentions(shot.action, c):
+            cast.append(c)
+    return cast
+
+
 def shot_prompt(bible: StoryBible, shot: Shot, film: bool = False) -> str:
     parts = [bible.art_style, FRAMING_PHRASES.get(shot.framing, ""), shot.action]
-    cast = [bible.character(cid) for cid in shot.character_ids]
-    for c in filter(None, cast):
+    cast = shot_cast(bible, shot)
+    for c in cast:
         parts.append(f"{c.name}: {c.appearance}")
+    if cast:
+        # Diffusion models tend to duplicate a described character in wide
+        # shots; state the head count explicitly.
+        names = " and ".join(c.name for c in cast)
+        parts.append(f"{names} each appear exactly once" if len(cast) > 1 else f"only one {cast[0].name} in the image")
     loc = bible.location(shot.location_id) if shot.location_id else None
     if loc:
         parts.append(f"Setting: {loc.description}")
