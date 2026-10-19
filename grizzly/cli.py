@@ -52,6 +52,7 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("doctor", help="check the machine and load/test each model")
     p.add_argument("--skip-llm", action="store_true")
     p.add_argument("--skip-image", action="store_true")
+    p.add_argument("--skip-refs", action="store_true")
 
     p = sub.add_parser("serve", help="start the local web studio")
     p.add_argument("--host", default="127.0.0.1")
@@ -90,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.cmd == "doctor":
         from grizzly.doctor import run_doctor
 
-        return run_doctor(profile, store.base.parent, args.skip_llm, args.skip_image, args.verbose)
+        return run_doctor(profile, store.base.parent, args.skip_llm, args.skip_image, args.skip_refs, args.verbose)
     elif args.cmd == "serve":
         try:
             import uvicorn

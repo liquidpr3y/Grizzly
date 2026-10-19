@@ -39,7 +39,9 @@ def _peak_gb() -> str:
     return f"peak {peak:.1f}GB"
 
 
-def run_doctor(profile: Profile, out_dir: Path, skip_llm: bool = False, skip_image: bool = False, verbose: bool = False) -> int:
+def run_doctor(
+    profile: Profile, out_dir: Path, skip_llm: bool = False, skip_image: bool = False, skip_refs: bool = False, verbose: bool = False
+) -> int:
     failures = 0
     print(f"Grizzly doctor - profile {profile.name}")
     print("Environment")
@@ -111,6 +113,34 @@ def run_doctor(profile: Profile, out_dir: Path, skip_llm: bool = False, skip_ima
         except Exception as exc:
             _fail("illustrator", exc, verbose)
             failures += 1
+
+    if profile.ref_backend and not skip_refs:
+        print(f"Reference renderer: {profile.ref_backend} {profile.ref_model} ({profile.ref_steps} steps)")
+        ref = out_dir / "doctor_512x512.png"
+        if not ref.exists():
+            print("  SKIP  needs doctor_512x512.png from the illustrator check; run without --skip-image once")
+        else:
+            try:
+                from grizzly.image import create_ref_model
+
+                t = time.time()
+                model = create_ref_model(profile)
+                _ok("load", f"{time.time() - t:.1f}s")
+                for refs, label in (([], "no reference"), ([ref], "1 reference")):
+                    t = time.time()
+                    img = model.generate(
+                        "ink and watercolour comic art, wide shot: the cat detective from image 1 crouches on a rooftop "
+                        "at night, full figure, London skyline and moon behind",
+                        7, 1024, 1024, refs=refs,
+                    )
+                    path = out_dir / f"doctor_ref_{len(refs)}.png"
+                    img.save(path)
+                    _ok(f"1024x1024 {label}", f"{time.time() - t:.1f}s {_peak_gb()}  -> {path}")
+                model.unload()
+                release_accelerator_memory()
+            except Exception as exc:
+                _fail("reference renderer", exc, verbose)
+                failures += 1
 
     print("All checks passed." if not failures else f"{failures} check(s) failed. Re-run with -v for tracebacks.")
     return 1 if failures else 0

@@ -8,6 +8,7 @@ there is no negative prompt and ~9 steps is enough.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from PIL import Image
 
@@ -23,7 +24,8 @@ class MfluxImageModel:
         self.steps = steps
         self.model = ZImage(model_config=ModelConfig.z_image_turbo(), model_path=model_path)
 
-    def generate(self, prompt: str, seed: int, width: int, height: int) -> Image.Image:
+    def generate(self, prompt: str, seed: int, width: int, height: int, refs: list[Path] | None = None) -> Image.Image:
+        # Text-only model: references are ignored.
         result = self.model.generate_image(
             seed=seed,
             prompt=prompt,

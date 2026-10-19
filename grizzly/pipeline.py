@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Callable
 
 from grizzly.config import Profile
-from grizzly.image import create_image_model
+from grizzly.image import create_image_model, create_ref_model
 from grizzly.llm import create_llm
 from grizzly.memory import ModelManager
 from grizzly.models import Project
@@ -34,6 +34,8 @@ class Pipeline:
         self.models = ModelManager(swap=profile.swap_models)
         self.models.register("llm", lambda: create_llm(profile))
         self.models.register("image", lambda: create_image_model(profile))
+        if profile.ref_backend:
+            self.models.register("ref_image", lambda: create_ref_model(profile))
 
     def run(
         self,
@@ -66,12 +68,19 @@ class Pipeline:
             self.store.save(project)
             return project
         if step in RENDER_STEPS:
-            model = self.models.acquire("image")
-            if step == "portraits":
-                render_portraits(project, root, model, self.profile, force, progress)
-            else:
-                render_shots(project, root, model, self.profile, force, only, progress, on_each=lambda: self.store.save(project))
-            self.store.save(project)
+            use_refs = bool(self.profile.ref_backend)
+            # Shots drawn from references need every portrait first.
+            if step == "portraits" or (use_refs and not project.status()["portraits"]):
+                model = self.models.acquire("image")
+                render_portraits(project, root, model, self.profile, force and step == "portraits", progress)
+                self.store.save(project)
+            if step == "images":
+                model = self.models.acquire("ref_image" if use_refs else "image")
+                render_shots(
+                    project, root, model, self.profile, force, only, progress,
+                    on_each=lambda: self.store.save(project), use_refs=use_refs,
+                )
+                self.store.save(project)
             return project
         if step == "comic":
             return build_comic(project, root)

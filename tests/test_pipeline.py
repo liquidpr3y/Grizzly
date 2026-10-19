@@ -1,5 +1,6 @@
 import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -66,3 +67,39 @@ def test_animatic(store, pipeline):
         capture_output=True, text=True, check=True,
     ).stdout.split()
     assert {"video", "audio", "subtitle"} <= set(out)
+
+
+def test_shots_are_drawn_from_character_portraits(store, pipeline):
+    project = store.create("Lighthouse", "premise", "comic")
+    for step in ("bible", "outline", "shots"):
+        pipeline.run(project.id, step, n_scenes=1, n_shots=3)
+    # The images step renders missing portraits itself before the shots.
+    pipeline.run(project.id, "images")
+    project = store.load(project.id)
+    root = store.root(project.id)
+    assert all(c.portrait for c in project.bible.characters)
+    calls = pipeline.models.acquire("ref_image").calls
+    assert len(calls) == 3
+    for shot, call in zip(project.shots, calls):
+        assert len(call["refs"]) == len(shot.character_ids)
+        for i, ref in enumerate(call["refs"]):
+            assert (root / "images" / "refs").samefile(Path(ref).parent)
+            assert f"image {i + 1}" in call["prompt"]
+    # References are downscaled to the profile's limit.
+    from PIL import Image
+
+    ref = Image.open(calls[0]["refs"][0])
+    assert max(ref.size) <= pipeline.profile.ref_max_side
+
+
+def test_refs_can_be_switched_off(store, monkeypatch):
+    from grizzly.config import load_profile
+    from grizzly.pipeline import Pipeline
+
+    monkeypatch.setenv("GRIZZLY_REFS", "off")
+    profile = load_profile("mock")
+    assert profile.ref_backend == ""
+    pipeline = Pipeline(profile, store)
+    project = store.create("Lighthouse", "premise", "comic")
+    pipeline.run_all(project.id, n_scenes=1, n_shots=2)
+    assert all(not c["refs"] for c in pipeline.models.acquire("image").calls)

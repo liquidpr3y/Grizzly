@@ -64,13 +64,17 @@ macOS lets the GPU wire roughly two thirds of unified memory. The `m5pro-24gb` p
 | Role | Default model | Approx. resident |
 |---|---|---|
 | Writer | `mlx-community/Qwen3-8B-4bit` (mlx-lm) | ~5GB |
-| Illustrator | Z-Image Turbo, 4-bit (`filipstrand/Z-Image-Turbo-mflux-4bit`, mflux) | ~6–7GB plus activations |
+| Character portraits | Z-Image Turbo, 4-bit (`filipstrand/Z-Image-Turbo-mflux-4bit`, mflux) | ~6–8GB peak |
+| Shots, drawn from the portraits | FLUX.2 Klein 4B, 4-bit (`mflux-community/flux2-klein-4b-mflux-q4`, mflux, Apache-2.0) | ~4.6GB download |
 
-Other profiles: `m5pro-24gb-ollama` (the writer runs in an existing Ollama install), `mac-48gb` (both models stay loaded, with a 14B writer) and `mock`. You can override models with `GRIZZLY_LLM_MODEL`, `GRIZZLY_IMAGE_MODEL` and `GRIZZLY_IMAGE_STEPS`.
+Other profiles: `m5pro-24gb-ollama` (the writer runs in an existing Ollama install), `mac-48gb` (both models stay loaded, with a 14B writer) and `mock`. You can override models with `GRIZZLY_LLM_MODEL`, `GRIZZLY_IMAGE_MODEL` and `GRIZZLY_IMAGE_STEPS`. `GRIZZLY_REFS=off` draws shots with Z-Image from text alone, as before.
 
-### Character consistency (current approach)
+### Character consistency
 
-Each prompt repeats three things: the global art style, the fixed `appearance` text of every visible character, and the location description. Seeds are derived from stable ids, so a re-render is reproducible. This gets you recognisably the same character, but not identical ones. Closing that gap is the main job of Phase 2.
+1. **Text.** Each prompt repeats the global art style, the fixed `appearance` text of every visible character, the location description and an explicit head count. Seeds are derived from stable ids, so a re-render is reproducible.
+2. **Reference images.** Z-Image draws one full-body portrait per character (`images/characters/`). FLUX.2 Klein then draws every shot with the portraits of up to three characters in frame as reference images (downscaled copies in `images/refs/`). The prompt names which image shows whom. This pins down details that text alone drifts on, such as a monocle turning into glasses.
+
+To change how a character looks: edit their appearance, then `grizzly step <id> portraits --force` and `grizzly step <id> images --force`.
 
 ## Roadmap
 
@@ -78,7 +82,6 @@ Each prompt repeats three things: the global art style, the fixed `appearance` t
 
 **Phase 2: quality**
 - Per-character LoRAs trained locally from the portrait sheet (mflux supports LoRA training), applied automatically when a character is in shot.
-- Reference-image editing models (FLUX Kontext / Qwen-Image-Edit class) for "same character, new pose".
 - Pose and layout control via ControlNet (Z-Image Turbo ControlNet Union is already in mflux).
 - Real image-to-video per shot (Wan 2.x 5B / LTX-Video class) replacing the Ken Burns clip in `render/animatic.py`.
 - Branching choices for visual novels; better bubble placement (face detection to point tails).

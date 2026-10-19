@@ -42,6 +42,8 @@ You are a storyboard artist adapting a scene into {format_note}
 Break the scene into exactly {n_shots} shots. For each shot:
 - "framing": one of "wide", "medium", "close-up"
 - "action": what the camera SEES, purely visual: poses, expressions, composition, lighting. Never include dialogue or written text.
+  Describe only what IS visible. Image models draw whatever you name, so avoid negations like "empty", "missing", "without" or "no":
+  write "a fish tank of still, clear water" rather than "an empty fish tank".
 - "character_ids": ids of characters visible in the shot
 - "dialogue": spoken lines in this shot, [{{"speaker": "character id", "text": "..."}}], may be empty
 - "narration": caption / voice-over text, may be empty

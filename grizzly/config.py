@@ -26,6 +26,15 @@ class Profile:
     llm_max_tokens: int = 3072
     llm_temperature: float = 0.7
     ollama_url: str = "http://127.0.0.1:11434"
+    # Reference-conditioned shot renderer: draws each shot with the portraits
+    # of the characters in frame as reference images. "" disables it (shots
+    # then use the text-only image model).
+    ref_backend: str = ""  # "mflux-flux2" | "mock" | ""
+    ref_model: str = ""
+    ref_steps: int = 4
+    # Portraits are downscaled to this longest side before use as references;
+    # every reference adds tokens, so smaller is faster and lighter.
+    ref_max_side: int = 512
     # Shot sizes per framing, kept to multiples of 16 for the diffusion VAE.
     sizes: dict[str, tuple[int, int]] = field(
         default_factory=lambda: {
@@ -38,6 +47,9 @@ class Profile:
     )
 
 
+# FLUX.2 Klein 4B (Apache-2.0), pre-quantised to 4-bit: ~4.6GB, 4 steps.
+_KLEIN_REFS = dict(ref_backend="mflux-flux2", ref_model="mflux-community/flux2-klein-4b-mflux-q4")
+
 PROFILES: dict[str, Profile] = {
     # ~5GB LLM + ~7GB diffusion (both 4-bit), swapped. Leaves headroom for
     # activations at ~1MP and for macOS itself.
@@ -48,6 +60,7 @@ PROFILES: dict[str, Profile] = {
         image_backend="mflux",
         image_model="filipstrand/Z-Image-Turbo-mflux-4bit",
         image_steps=9,
+        **_KLEIN_REFS,
     ),
     # Same machine, but the writer runs in an existing Ollama install.
     "m5pro-24gb-ollama": Profile(
@@ -57,6 +70,7 @@ PROFILES: dict[str, Profile] = {
         image_backend="mflux",
         image_model="filipstrand/Z-Image-Turbo-mflux-4bit",
         image_steps=9,
+        **_KLEIN_REFS,
     ),
     # Machines with 48GB+ can keep both models loaded and use a bigger writer.
     "mac-48gb": Profile(
@@ -66,6 +80,7 @@ PROFILES: dict[str, Profile] = {
         image_backend="mflux",
         image_model="filipstrand/Z-Image-Turbo-mflux-4bit",
         image_steps=9,
+        **_KLEIN_REFS,
         swap_models=False,
     ),
     # No ML at all: canned writer, placeholder art. Runs anywhere (CI, Linux).
@@ -76,6 +91,9 @@ PROFILES: dict[str, Profile] = {
         image_backend="mock",
         image_model="mock",
         image_steps=1,
+        ref_backend="mock",
+        ref_model="mock",
+        ref_max_side=128,
         sizes={
             "wide": (672, 384),
             "medium": (512, 512),
@@ -104,6 +122,8 @@ def load_profile(name: str | None = None) -> Profile:
     ):
         if os.environ.get(env):
             overrides[key] = cast(os.environ[env])
+    if os.environ.get("GRIZZLY_REFS", "").lower() in ("0", "off", "false", "no"):
+        overrides["ref_backend"] = ""
     return replace(profile, **overrides) if overrides else profile
 
 

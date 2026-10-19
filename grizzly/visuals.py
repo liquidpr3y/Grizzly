@@ -1,9 +1,10 @@
 """Turn shots into image prompts and render them.
 
-Consistency strategy for the prototype: every prompt repeats the global art
-style, each visible character's fixed appearance text and the location
-description, with seeds derived from stable ids. Next steps (see README) are
-per-character LoRAs and reference-image conditioning.
+Consistency strategy: every prompt repeats the global art style, each visible
+character's fixed appearance text and the location description, with seeds
+derived from stable ids. When the profile has a reference renderer, each shot
+is also drawn from the portraits of the characters in frame, which pins down
+details text alone drifts on (which eye the monocle is on, glasses vs monocle).
 """
 
 from __future__ import annotations
@@ -13,6 +14,8 @@ import re
 import zlib
 from pathlib import Path
 from typing import Callable
+
+from PIL import Image
 
 from grizzly.config import Profile
 from grizzly.image import ImageModel
@@ -26,6 +29,8 @@ FRAMING_PHRASES = {
     "close-up": "close-up on the face, expressive detail",
 }
 NO_TEXT = "clean illustration with no text, no lettering, no speech bubbles, no watermark"
+# Each reference adds image tokens (time and memory); a panel rarely needs more.
+MAX_REFS = 3
 
 
 def stable_seed(project: Project, key: str) -> int:
@@ -34,8 +39,9 @@ def stable_seed(project: Project, key: str) -> int:
 
 def portrait_prompt(bible: StoryBible, c: Character) -> str:
     return (
-        f"{bible.art_style}. Character reference portrait of {c.name}: {c.appearance}. "
-        f"Three-quarter view, neutral plain background, even lighting. {NO_TEXT}."
+        f"{bible.art_style}. Full-body character reference of {c.name}: {c.appearance}. "
+        f"Single figure, standing, three-quarter view, whole outfit and accessories clearly visible, "
+        f"plain light background, even lighting. {NO_TEXT}."
     )
 
 
@@ -59,11 +65,17 @@ def shot_cast(bible: StoryBible, shot: Shot) -> list[Character]:
     return cast
 
 
-def shot_prompt(bible: StoryBible, shot: Shot, film: bool = False) -> str:
+def shot_prompt(bible: StoryBible, shot: Shot, film: bool = False, ref_ids: list[str] | None = None) -> str:
+    """ref_ids: ids of the characters whose portraits are passed as reference
+    images, in order, so the prompt can say which image shows whom."""
     parts = [bible.art_style, FRAMING_PHRASES.get(shot.framing, ""), shot.action]
     cast = shot_cast(bible, shot)
+    ref_ids = ref_ids or []
     for c in cast:
-        parts.append(f"{c.name}: {c.appearance}")
+        if c.id in ref_ids:
+            parts.append(f"{c.name} looks exactly like the character in image {ref_ids.index(c.id) + 1}: {c.appearance}")
+        else:
+            parts.append(f"{c.name}: {c.appearance}")
     # Diffusion models duplicate characters in wide shots and invent them in
     # empty ones. They don't know character names, so give a numeric count.
     if not cast:
@@ -109,6 +121,24 @@ def render_portraits(project: Project, root: Path, model: ImageModel, profile: P
         c.portrait = str(path.relative_to(root))
 
 
+def reference_images(project: Project, root: Path, profile: Profile, shot: Shot) -> list[tuple[str, Path]]:
+    """(character id, downscaled portrait) for the characters in frame that
+    have a portrait, at most MAX_REFS, in cast order."""
+    out = root / "images" / "refs"
+    refs: list[tuple[str, Path]] = []
+    for c in shot_cast(project.bible, shot)[:MAX_REFS]:
+        if not c.portrait or not (root / c.portrait).exists():
+            continue
+        src, dst = root / c.portrait, out / f"{c.id}.png"
+        if not dst.exists() or dst.stat().st_mtime < src.stat().st_mtime:
+            out.mkdir(parents=True, exist_ok=True)
+            img = Image.open(src).convert("RGB")
+            img.thumbnail((profile.ref_max_side, profile.ref_max_side), Image.LANCZOS)
+            img.save(dst)
+        refs.append((c.id, dst))
+    return refs
+
+
 def render_shots(
     project: Project,
     root: Path,
@@ -118,6 +148,7 @@ def render_shots(
     only: set[str] | None = None,
     progress: Progress | None = None,
     on_each: Callable[[], None] | None = None,
+    use_refs: bool = False,
 ) -> None:
     out = root / "images" / "shots"
     out.mkdir(parents=True, exist_ok=True)
@@ -130,9 +161,10 @@ def render_shots(
         if progress:
             progress(i, len(todo), f"shot {shot.id}")
         w, h = shot_size(profile, project, shot)
-        prompt = shot_prompt(project.bible, shot, film=project.format != "comic")
-        log.info("Rendering %s (%dx%d): %s", shot.id, w, h, prompt[:160])
-        img = model.generate(prompt, stable_seed(project, shot.id), w, h)
+        refs = reference_images(project, root, profile, shot) if use_refs else []
+        prompt = shot_prompt(project.bible, shot, film=project.format != "comic", ref_ids=[cid for cid, _ in refs])
+        log.info("Rendering %s (%dx%d, %d refs): %s", shot.id, w, h, len(refs), prompt[:160])
+        img = model.generate(prompt, stable_seed(project, shot.id), w, h, refs=[p for _, p in refs])
         path = out / f"{shot.id}.png"
         img.save(path)
         shot.image = str(path.relative_to(root))
