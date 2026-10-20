@@ -1,9 +1,9 @@
-import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
 
+from grizzly import tools
 from grizzly.visuals import shot_prompt
 
 
@@ -57,16 +57,13 @@ def test_steps_enforce_order(store, pipeline):
         pipeline.run(project.id, "outline")
 
 
-@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="ffmpeg not installed")
+@pytest.mark.skipif(not tools.has_ffmpeg(), reason="ffmpeg not installed")
 def test_animatic(store, pipeline):
     project = store.create("Lighthouse", "premise", "film")
     mp4 = pipeline.run_all(project.id, n_scenes=1, n_shots=2)
     assert mp4.exists()
-    out = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "stream=codec_type", "-of", "csv=p=0", str(mp4)],
-        capture_output=True, text=True, check=True,
-    ).stdout.split()
-    assert {"video", "audio", "subtitle"} <= set(out)
+    banner = subprocess.run([tools.ffmpeg(), "-hide_banner", "-i", str(mp4)], capture_output=True, text=True).stderr
+    assert all(f"{kind}:" in banner for kind in ("Video", "Audio", "Subtitle"))
 
 
 def test_shots_are_drawn_from_character_portraits(store, pipeline):
@@ -181,7 +178,7 @@ def test_run_all_writes_a_report(store, pipeline):
     assert report["total_seconds"] >= 0
 
 
-@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="ffmpeg not installed")
+@pytest.mark.skipif(not tools.has_ffmpeg(), reason="ffmpeg not installed")
 def test_video_step_animates_shots_and_animatic_uses_the_clips(store, pipeline):
     project = store.create("Lighthouse", "premise", "film")
     pipeline.run_all(project.id, n_scenes=1, n_shots=2)
@@ -195,9 +192,6 @@ def test_video_step_animates_shots_and_animatic_uses_the_clips(store, pipeline):
     call = pipeline.models.acquire("video").calls[0]
     assert call["image"].endswith(f"{first}.png") and "move naturally" in call["prompt"]
     mp4 = pipeline.run(project.id, "animatic")
-    dur = float(subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(mp4)],
-        capture_output=True, text=True, check=True,
-    ).stdout)
+    dur = tools.media_duration(mp4)
     # The 13-frame clip is held on its last frame for the shot's full duration.
     assert dur >= sum(s.duration for s in shots) - 0.5

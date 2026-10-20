@@ -190,7 +190,6 @@ def test_wan_backend_passes_the_panel_and_settings_to_mlx_video(monkeypatch, tmp
 
 
 def test_clip_motion_separates_moving_from_frozen(tmp_path):
-    import shutil
     import subprocess
 
     import pytest
@@ -199,7 +198,9 @@ def test_clip_motion_separates_moving_from_frozen(tmp_path):
     from grizzly.motion import STATIC_THRESHOLD, clip_motion
     from grizzly.video.mock import MockVideoModel
 
-    if not shutil.which("ffmpeg"):
+    from grizzly.tools import ffmpeg, has_ffmpeg
+
+    if not has_ffmpeg():
         pytest.skip("ffmpeg not installed")
     img = Image.new("RGB", (640, 360), "white")
     draw = ImageDraw.Draw(img)
@@ -208,7 +209,7 @@ def test_clip_motion_separates_moving_from_frozen(tmp_path):
     img.save(tmp_path / "p.png")
     MockVideoModel().generate("x", tmp_path / "p.png", 1, 320, 192, 25, tmp_path / "zoom.mp4")
     subprocess.run(
-        ["ffmpeg", "-y", "-loop", "1", "-i", str(tmp_path / "p.png"), "-t", "1", "-vf", "scale=320:192,format=yuv420p",
+        [ffmpeg(), "-y", "-loop", "1", "-i", str(tmp_path / "p.png"), "-t", "1", "-vf", "scale=320:192,format=yuv420p",
          str(tmp_path / "still.mp4")], check=True, capture_output=True,
     )
     assert clip_motion(tmp_path / "zoom.mp4") > STATIC_THRESHOLD > clip_motion(tmp_path / "still.mp4")
@@ -258,3 +259,42 @@ def test_serve_refuses_a_busy_port_and_exits_with_its_parent(tmp_path):
     else:
         os.kill(engine, 9)
         raise AssertionError("engine outlived its parent")
+
+
+def test_ffmpeg_falls_back_to_the_bundled_binary(monkeypatch, tmp_path):
+    """Without Homebrew (no ffmpeg on PATH) the wheel's static ffmpeg is used,
+    and it handles everything the animatic and the motion check need."""
+    import shutil
+
+    import pytest
+
+    imageio_ffmpeg = pytest.importorskip("imageio_ffmpeg")
+    from grizzly import tools
+    from grizzly.render.animatic import W, H, _shot_clip
+
+    tools.ffmpeg.cache_clear()
+    monkeypatch.delenv("GRIZZLY_FFMPEG", raising=False)
+    monkeypatch.setattr(shutil, "which", lambda name, *a, **k: None)
+    try:
+        assert tools.ffmpeg() == imageio_ffmpeg.get_ffmpeg_exe()
+        from PIL import Image
+
+        Image.new("RGB", (W, H), "teal").save(tmp_path / "p.png")
+        _shot_clip(tmp_path / "p.png", None, 1.5, 0, tmp_path / "clip.mp4")
+        assert abs(tools.media_duration(tmp_path / "clip.mp4") - 1.5) < 0.1
+        monkeypatch.setenv("GRIZZLY_FFMPEG", "/opt/custom/ffmpeg")
+        tools.ffmpeg.cache_clear()
+        assert tools.ffmpeg() == "/opt/custom/ffmpeg"
+    finally:
+        tools.ffmpeg.cache_clear()
+
+
+def test_media_duration_parses_the_banner(monkeypatch, tmp_path):
+    import subprocess
+
+    from grizzly import tools
+
+    banner = "Input #0, wav, from 'x.wav':\n  Duration: 00:01:02.50, bitrate: 1411 kb/s\n"
+    monkeypatch.setattr(tools, "ffmpeg", lambda: "ffmpeg")
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 1, "", banner))
+    assert tools.media_duration(tmp_path / "x.wav") == 62.5

@@ -1,6 +1,6 @@
 # Grizzly for Mac
 
-The native SwiftUI front end. It starts the Python engine (`grizzly serve`) from your Grizzly checkout and talks to it over the engine's local HTTP API on `127.0.0.1`. That's the same model Ollama's app uses: a native shell around a local inference server.
+The native SwiftUI front end. It starts the Python engine (`grizzly serve`) and talks to it over the engine's local HTTP API on `127.0.0.1`. That's the same model Ollama's app uses: a native shell around a local inference server.
 
 ```
 Grizzly.app (SwiftUI)  ──HTTP 127.0.0.1:8642──▶  grizzly serve (Python: MLX writer, mflux, mlx-video)
@@ -8,17 +8,20 @@ Grizzly.app (SwiftUI)  ──HTTP 127.0.0.1:8642──▶  grizzly serve (Python
       └── starts / stops the engine process ─────────────┘
 ```
 
+The engine runs from one of two places:
+
+- **Built in** (the default when present): `Grizzly.app/Contents/Resources/engine`, made by `scripts/make-app.sh`. It holds a standalone Python 3.12 ([python-build-standalone](https://github.com/astral-sh/python-build-standalone), fetched by uv), Grizzly with MLX, mflux and mlx-video installed into it, and a static ffmpeg. The Mac it runs on needs no Python, uv or Homebrew. Model weights are not bundled; they download on first use, as before.
+- **A Grizzly checkout**, for development: `~/Grizzly/.venv`, or any folder you pick in Settings.
+
 ## Run it
 
-Requirements: macOS 14 or later, Xcode 16 or later, and the engine already installed in your checkout (`uv pip install -e '.[mac,server,video]'` from the repo root, as in the main README).
+Requirements to build: macOS 14 or later, Xcode 16 or later, and uv.
 
-Pick one way to run it:
+- **Self-contained app:** `app/scripts/make-app.sh`, then `open app/build/Grizzly.app`. The first build takes a few minutes and downloads about 1.5GB of Python packages. `--reuse` skips rebuilding the engine; `--no-engine` builds the app alone.
+- **Xcode (while developing):** `open app/Package.swift`, pick the **Grizzly** scheme and **My Mac**, then press ⌘R. This runs the engine from your checkout (`uv pip install -e '.[mac,server,video]'` from the repo root first).
+- **Terminal:** `cd app && swift run Grizzly`, also from your checkout.
 
-- **Xcode (recommended while developing):** `open app/Package.swift`, pick the **Grizzly** scheme and **My Mac**, then press ⌘R.
-- **Terminal:** `cd app && swift run Grizzly`
-- **Double-clickable app:** `app/scripts/make-app.sh`, then `open app/build/Grizzly.app`
-
-On first launch the app looks for the engine in `~/Grizzly/.venv`. If your checkout is somewhere else, use **Settings → Choose…** or the button on the "engine isn't running" screen. If an engine is already running on the port (for example `grizzly serve` in a terminal), the app uses it instead of starting its own. Quitting the app stops the engine it started, so model memory is released.
+Without a built-in engine the app looks in `~/Grizzly/.venv`. If your checkout is somewhere else, use **Settings → Choose…** or the button on the "engine isn't running" screen. An app with a built-in engine can be switched to a checkout in **Settings → Engine**. If an engine is already running on the port (for example `grizzly serve` in a terminal), the app uses it instead of starting its own. Quitting the app stops the engine it started, so model memory is released.
 
 ## What's where
 
@@ -40,9 +43,11 @@ While a job runs on a story, editing that story is locked. The engine saves its 
 - `Sources/Grizzly`: the SwiftUI app.
 - `Tests/GrizzlyCoreTests`: unit tests, plus an integration test that launches the real engine with mock models and drives a whole story through the client.
 
-GrizzlyCore builds and is tested on Linux too: `GRIZZLY_ENGINE_DIR=/path/to/Grizzly swift test`. The SwiftUI target compiles only on macOS; elsewhere it builds to a stub.
+- `scripts/bundle-engine.sh`: builds the self-contained engine; `scripts/make-app.sh`: builds and signs the app around it.
+
+GrizzlyCore builds and is tested on Linux too: `GRIZZLY_ENGINE_DIR=/path/to/Grizzly swift test`. Add `GRIZZLY_BUNDLED_ENGINE=/path/to/engine` (from `GRIZZLY_EXTRAS=server scripts/bundle-engine.sh /path/to/engine`) to also run a story through a bundled engine and check it writes nothing into its own folder. The SwiftUI target compiles only on macOS; elsewhere it builds to a stub.
 
 ## Not done yet
 
-- **Bundling the engine inside the .app.** Today the app runs the engine from your checkout's `.venv`. Shipping to other people needs a relocatable Python, the MLX packages and ffmpeg inside `Grizzly.app/Contents/Resources`, plus a first-launch model download manager, Developer ID signing and notarisation.
+- **Distribution.** The app is self-contained but signed ad hoc, so it runs only on the Mac that built it. Shipping needs a first-launch model download manager, Developer ID signing with the hardened runtime, notarisation, and a licence review of everything bundled (the static ffmpeg is a GPL build).
 - App icon, a cancel button for running jobs, and editing the outline from the app.

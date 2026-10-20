@@ -16,6 +16,7 @@ from PIL import Image, ImageChops, ImageStat
 
 from grizzly.config import Profile
 from grizzly.models import Project, Shot
+from grizzly.tools import ffmpeg
 from grizzly.video import VideoModel
 from grizzly.visuals import Progress, shot_cast, stable_seed
 
@@ -39,7 +40,7 @@ def clip_motion(path: Path) -> float:
         first, last = Path(tmp) / "first.png", Path(tmp) / "last.png"
         for args, out in ((["-i", str(path)], first), (["-sseof", "-0.1", "-i", str(path)], last)):
             subprocess.run(
-                ["ffmpeg", "-y", *args, "-frames:v", "1", "-update", "1", str(out)],
+                [ffmpeg(), "-y", *args, "-frames:v", "1", "-update", "1", str(out)],
                 check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
             )
         a = Image.open(first).convert("L")

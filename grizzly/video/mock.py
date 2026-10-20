@@ -5,6 +5,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+from grizzly.tools import ffmpeg
+
 
 class MockVideoModel:
     def __init__(self) -> None:
@@ -18,7 +20,7 @@ class MockVideoModel:
             "format=yuv420p"
         )
         subprocess.run(
-            ["ffmpeg", "-y", "-i", str(image), "-vf", vf, "-frames:v", str(frames), "-c:v", "libx264", str(out)],
+            [ffmpeg(), "-y", "-i", str(image), "-vf", vf, "-frames:v", str(frames), "-c:v", "libx264", str(out)],
             check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
         )
         self.calls.append({"prompt": prompt, "image": str(image), "seed": seed})

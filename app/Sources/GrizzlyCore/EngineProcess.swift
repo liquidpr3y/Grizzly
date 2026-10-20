@@ -1,9 +1,17 @@
 import Foundation
 
-/// Launches and supervises the Python engine (`grizzly serve`) from a local
-/// checkout with a `.venv`. This is the development setup; a shipped app
-/// would bundle the engine inside the .app and point `engineDirectory` there.
+/// Launches and supervises the Python engine (`grizzly serve`), either from a
+/// developer checkout with a `.venv` or from the self-contained engine that
+/// `scripts/bundle-engine.sh` builds into `Grizzly.app/Contents/Resources/engine`.
 public final class EngineProcess: @unchecked Sendable {
+    public enum Layout: Sendable, Equatable {
+        /// A Grizzly checkout: `.venv/bin/grizzly`, ffmpeg from Homebrew or the wheel.
+        case checkout
+        /// A bundled engine: standalone `python/bin/python3 -m grizzly`, with
+        /// ffmpeg in `bin/`. Read-only, so Python must not write bytecode into it.
+        case bundled
+    }
+
     public struct Configuration: Sendable {
         public var engineDirectory: URL
         public var port: Int
@@ -17,9 +25,36 @@ public final class EngineProcess: @unchecked Sendable {
             self.environment = environment
         }
 
-        /// The engine executable inside the checkout's virtual environment.
+        /// A bundled engine has `python/bin/python3`; anything else is treated as a checkout.
+        public var layout: Layout {
+            FileManager.default.isExecutableFile(atPath: engineDirectory.appendingPathComponent("python/bin/python3").path)
+                ? .bundled : .checkout
+        }
+
         public var executable: URL {
-            engineDirectory.appendingPathComponent(".venv/bin/grizzly")
+            switch layout {
+            case .checkout: engineDirectory.appendingPathComponent(".venv/bin/grizzly")
+            case .bundled: engineDirectory.appendingPathComponent("python/bin/python3")
+            }
+        }
+
+        public var arguments: [String] {
+            // -s: ignore the user's own site-packages (~/Library/Python).
+            let launcher = layout == .bundled ? ["-s", "-m", "grizzly"] : []
+            // --exit-with-parent: if this app is killed outright (no chance to call
+            // stop()), the engine notices and exits instead of lingering.
+            return launcher + (profile.map { ["--profile", $0] } ?? [])
+                + ["serve", "--port", String(port), "--exit-with-parent"]
+        }
+
+        /// Variables for the engine on top of the app's own environment.
+        var layoutEnvironment: [String: String] {
+            guard layout == .bundled else { return [:] }
+            return [
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "PYTHONNOUSERSITE": "1",
+                "GRIZZLY_ENGINE_BIN": engineDirectory.appendingPathComponent("bin").path,
+            ]
         }
     }
 
@@ -34,7 +69,8 @@ public final class EngineProcess: @unchecked Sendable {
         public var errorDescription: String? {
             switch self {
             case let .missingExecutable(url):
-                "No engine at \(url.path). Choose the Grizzly folder that contains the .venv you installed with uv."
+                "No engine at \(url.path). Choose the Grizzly folder that contains the .venv you installed with uv, "
+                    + "or build the app with its engine bundled (scripts/make-app.sh)."
             case let .portInUse(port):
                 "Port \(port) is already in use, most likely by a Grizzly engine left running from an earlier session "
                     + "(for example after stopping the app from Xcode). Find it with `lsof -nP -iTCP:\(port) -sTCP:LISTEN`, "
@@ -68,12 +104,12 @@ public final class EngineProcess: @unchecked Sendable {
         }
         let process = Process()
         process.executableURL = configuration.executable
-        // --exit-with-parent: if this app is killed outright (no chance to call
-        // stop()), the engine notices and exits instead of lingering.
-        process.arguments = (configuration.profile.map { ["--profile", $0] } ?? [])
-            + ["serve", "--port", String(configuration.port), "--exit-with-parent"]
+        process.arguments = configuration.arguments
         process.currentDirectoryURL = configuration.engineDirectory
-        process.environment = Self.environment(adding: configuration.environment)
+        process.environment = Self.environment(
+            adding: configuration.layoutEnvironment.merging(configuration.environment) { $1 },
+            layout: configuration.layout
+        )
 
         let pipe = Pipe()
         process.standardOutput = pipe
@@ -130,12 +166,19 @@ public final class EngineProcess: @unchecked Sendable {
         }
     }
 
-    /// Apps launched from Finder get a minimal PATH; the engine needs ffmpeg
-    /// (Homebrew) and the user's tools.
-    static func environment(adding extra: [String: String]) -> [String: String] {
+    /// Apps launched from Finder get a minimal PATH. A checkout engine needs
+    /// ffmpeg (Homebrew) and the user's tools; a bundled one brings its own
+    /// ffmpeg and must not pick up the user's Python setup.
+    static func environment(adding extra: [String: String], layout: Layout = .checkout) -> [String: String] {
         var env = ProcessInfo.processInfo.environment
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let paths = ["/opt/homebrew/bin", "/usr/local/bin", "\(home)/.local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+        var paths = ["/opt/homebrew/bin", "/usr/local/bin", "\(home)/.local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+        if layout == .bundled {
+            for key in ["PYTHONPATH", "PYTHONHOME", "PYTHONSTARTUP", "VIRTUAL_ENV", "CONDA_PREFIX"] {
+                env[key] = nil
+            }
+            paths.insert(contentsOf: extra["GRIZZLY_ENGINE_BIN"].map { [$0] } ?? [], at: 0)
+        }
         let existing = env["PATH"].map { $0.split(separator: ":").map(String.init) } ?? []
         env["PATH"] = (paths + existing).reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }.joined(separator: ":")
         env["PYTHONUNBUFFERED"] = "1"

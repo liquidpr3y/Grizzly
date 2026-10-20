@@ -11,6 +11,7 @@ import subprocess
 from pathlib import Path
 
 from grizzly.models import Project, Shot
+from grizzly.tools import ffmpeg, media_duration
 
 FPS = 24
 W, H = 1280, 720
@@ -18,14 +19,6 @@ W, H = 1280, 720
 
 def _run(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-
-
-def _duration(path: Path) -> float:
-    out = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
-        check=True, capture_output=True, text=True,
-    )
-    return float(out.stdout.strip() or 0)
 
 
 def _lines(project: Project, shot: Shot) -> list[tuple[str, str]]:
@@ -51,12 +44,12 @@ def _voice(lines: list[tuple[str, str]], work: Path, shot_id: str) -> tuple[Path
             # Unknown voice name: fall back to the system voice.
             _run(["say", "-o", str(part), text])
         parts.append(part)
-        durs.append(_duration(part) + 0.3)
+        durs.append(media_duration(part) + 0.3)
     combined = work / f"{shot_id}.wav"
     inputs = sum((["-i", str(p)] for p in parts), [])
     chain = "".join(f"[{i}:a]aresample=44100,apad=pad_dur=0.3[a{i}];" for i in range(len(parts)))
     chain += "".join(f"[a{i}]" for i in range(len(parts))) + f"concat=n={len(parts)}:v=0:a=1[out]"
-    _run(["ffmpeg", "-y", *inputs, "-filter_complex", chain, "-map", "[out]", "-ac", "2", str(combined)])
+    _run([ffmpeg(), "-y", *inputs, "-filter_complex", chain, "-map", "[out]", "-ac", "2", str(combined)])
     return combined, durs
 
 
@@ -70,7 +63,7 @@ def _shot_clip(image: Path, audio: Path | None, duration: float, index: int, out
     )
     audio_in = ["-i", str(audio)] if audio else ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo"]
     _run([
-        "ffmpeg", "-y", "-i", str(image), *audio_in,
+        ffmpeg(), "-y", "-i", str(image), *audio_in,
         "-filter_complex", f"[0:v]{vf}[v];[1:a]apad,aresample=44100[a]",
         "-map", "[v]", "-map", "[a]", "-t", f"{duration:.3f}",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-r", str(FPS),
@@ -86,7 +79,7 @@ def _video_clip(video: Path, audio: Path | None, duration: float, out: Path) -> 
     )
     audio_in = ["-i", str(audio)] if audio else ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo"]
     _run([
-        "ffmpeg", "-y", "-i", str(video), *audio_in,
+        ffmpeg(), "-y", "-i", str(video), *audio_in,
         "-filter_complex", f"[0:v]{vf}[v];[1:a]apad,aresample=44100[a]",
         "-map", "[v]", "-map", "[a]", "-t", f"{duration:.3f}",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-r", str(FPS),
@@ -103,8 +96,7 @@ def _ts(t: float) -> str:
 
 
 def build_animatic(project: Project, root: Path) -> Path:
-    if not shutil.which("ffmpeg"):
-        raise RuntimeError("ffmpeg not found. Install it with: brew install ffmpeg")
+    ffmpeg()  # fail early with an install hint
     out = root / "exports" / "animatic"
     work = out / "_work"
     work.mkdir(parents=True, exist_ok=True)
@@ -132,7 +124,7 @@ def build_animatic(project: Project, root: Path) -> Path:
     concat = work / "clips.txt"
     concat.write_text("".join(f"file '{c.name}'\n" for c in clips))
     joined = work / "joined.mp4"
-    _run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat), "-c", "copy", str(joined)])
+    _run([ffmpeg(), "-y", "-f", "concat", "-safe", "0", "-i", str(concat), "-c", "copy", str(joined)])
     final = out / f"{project.id}.mp4"
     subs = out / f"{project.id}.srt"
     subs.write_text("\n".join(srt))
@@ -140,7 +132,7 @@ def build_animatic(project: Project, root: Path) -> Path:
         shutil.copy(joined, final)
         return final
     _run([
-        "ffmpeg", "-y", "-i", str(joined), "-i", str(subs),
+        ffmpeg(), "-y", "-i", str(joined), "-i", str(subs),
         "-map", "0", "-map", "1", "-c", "copy", "-c:s", "mov_text", str(final),
     ])
     return final

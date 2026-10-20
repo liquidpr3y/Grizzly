@@ -12,6 +12,7 @@ from pathlib import Path
 from grizzly.config import Profile
 from grizzly.jsonutil import extract_json
 from grizzly.memory import peak_memory_gb, release_accelerator_memory
+from grizzly.tools import ffmpeg, has_ffmpeg
 
 
 def _ok(label: str, detail: str = "") -> None:
@@ -39,11 +40,14 @@ def run_doctor(
     print(f"  ..    Python {sys.version.split()[0]} on {platform.system()} {platform.machine()}")
     if platform.system() == "Darwin" and platform.machine() != "arm64":
         print("  WARN  Not running natively on Apple Silicon (Rosetta Python?). MLX needs an arm64 Python.")
-    for tool in ("ffmpeg", "say"):
-        if shutil.which(tool):
-            _ok(tool)
-        else:
-            print(f"  WARN  {tool} not found ({'brew install ffmpeg' if tool == 'ffmpeg' else 'macOS only; animatic will be silent'})")
+    if has_ffmpeg():
+        _ok(f"ffmpeg ({ffmpeg()})")
+    else:
+        print("  WARN  ffmpeg not found (brew install ffmpeg); animatic and video need it")
+    if shutil.which("say"):
+        _ok("say")
+    else:
+        print("  WARN  say not found (macOS only; animatic will be silent)")
 
     if profile.llm_backend == "mlx" or profile.image_backend == "mflux":
         try:

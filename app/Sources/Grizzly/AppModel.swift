@@ -17,6 +17,8 @@ enum EngineState: Equatable {
 final class AppModel {
     // Settings, persisted in UserDefaults.
     var engineDirectory: String
+    /// Run the engine shipped inside the app rather than a checkout's `.venv`.
+    var useBundledEngine: Bool
     var port: Int
     var profile: String
 
@@ -44,6 +46,7 @@ final class AppModel {
 
     private enum Keys {
         static let directory = "engineDirectory"
+        static let bundled = "useBundledEngine"
         static let port = "enginePort"
         static let profile = "engineProfile"
     }
@@ -51,6 +54,7 @@ final class AppModel {
     init() {
         let defaults = UserDefaults.standard
         engineDirectory = defaults.string(forKey: Keys.directory) ?? "~/Grizzly"
+        useBundledEngine = defaults.object(forKey: Keys.bundled) as? Bool ?? true
         let savedPort = defaults.integer(forKey: Keys.port)
         port = savedPort == 0 ? 8642 : savedPort
         profile = defaults.string(forKey: Keys.profile) ?? "m5pro-24gb"
@@ -60,11 +64,33 @@ final class AppModel {
     func saveSettings() {
         let defaults = UserDefaults.standard
         defaults.set(engineDirectory, forKey: Keys.directory)
+        defaults.set(useBundledEngine, forKey: Keys.bundled)
         defaults.set(port, forKey: Keys.port)
         defaults.set(profile, forKey: Keys.profile)
     }
 
     // MARK: Engine lifecycle
+
+    /// The engine built into Grizzly.app by scripts/make-app.sh, if this build has one.
+    static let bundledEngine: URL? = {
+        guard let url = Bundle.main.resourceURL?.appendingPathComponent("engine"),
+              FileManager.default.fileExists(atPath: url.appendingPathComponent("python/bin/python3").path)
+        else { return nil }
+        return url
+    }()
+
+    /// Version stamp the bundle script writes next to the engine.
+    static let bundledEngineVersion: String? = bundledEngine.flatMap {
+        try? String(contentsOf: $0.appendingPathComponent("VERSION"), encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var usingBundledEngine: Bool { useBundledEngine && Self.bundledEngine != nil }
+
+    var engineURL: URL {
+        if usingBundledEngine, let bundled = Self.bundledEngine { return bundled }
+        return URL(fileURLWithPath: (engineDirectory as NSString).expandingTildeInPath)
+    }
 
     func startEngine() async {
         guard engineState != .starting, engineState != .running else { return }
@@ -75,8 +101,7 @@ final class AppModel {
             await engineDidStart()
             return
         }
-        let directory = URL(fileURLWithPath: (engineDirectory as NSString).expandingTildeInPath)
-        let process = EngineProcess(configuration: .init(engineDirectory: directory, port: port, profile: profile))
+        let process = EngineProcess(configuration: .init(engineDirectory: engineURL, port: port, profile: profile))
         process.onOutput = { [weak self] line in
             Task { @MainActor in self?.appendLog(line) }
         }

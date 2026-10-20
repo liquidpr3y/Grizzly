@@ -8,13 +8,13 @@ Everything runs on-device: no cloud, no API keys.
 
 Prototype, aimed at a **MacBook Pro M5 Pro with 24GB**.
 
-- The pipeline, the exports, the web studio and the CLI are tested end to end with mock backends (`pytest`, 13 tests).
+- The pipeline, the exports, the web studio and the CLI are tested end to end with mock backends (`pytest`).
 - The MLX backends (`grizzly/llm/mlx_backend.py`, `grizzly/image/mflux_backend.py`) are written against the current `mlx-lm` 0.32 and `mflux` 0.23 sources. Their first real run happens on the Mac.
 
 ## Quick start (Mac)
 
 ```sh
-brew install ffmpeg uv
+brew install uv          # ffmpeg comes with the Python install; a Homebrew ffmpeg is used if present
 git clone https://github.com/liquidpr3y/Grizzly && cd Grizzly
 uv venv --python 3.12 && source .venv/bin/activate
 uv pip install -e '.[mac,server]'

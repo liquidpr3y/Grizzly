@@ -93,11 +93,13 @@ struct EngineFailedView: View {
                 .multilineTextAlignment(.center)
                 .textSelection(.enabled)
                 .frame(maxWidth: 560)
-            Text("Engine folder: \(model.engineDirectory)")
+            Text(model.usingBundledEngine ? "Built-in engine" : "Engine folder: \(model.engineDirectory)")
                 .font(.callout.monospaced())
                 .foregroundStyle(.secondary)
             HStack {
-                Button("Choose Grizzly Folder…") { chooseEngineFolder(model) }
+                if !model.usingBundledEngine {
+                    Button("Choose Grizzly Folder…") { chooseEngineFolder(model) }
+                }
                 Button("Try Again") { Task { await model.restartEngine() } }
                     .buttonStyle(.borderedProminent)
             }
@@ -146,6 +148,7 @@ func chooseEngineFolder(_ model: AppModel) {
     panel.message = "Choose your Grizzly checkout (the folder with pyproject.toml and .venv)."
     if panel.runModal() == .OK, let url = panel.url {
         model.engineDirectory = url.path
+        model.useBundledEngine = false
         Task { await model.restartEngine() }
     }
 }
@@ -157,12 +160,20 @@ struct SettingsView: View {
         @Bindable var model = model
         Form {
             Section("Engine") {
-                LabeledContent("Grizzly folder") {
-                    HStack {
-                        Text(model.engineDirectory)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        Button("Choose…") { chooseEngineFolder(model) }
+                if AppModel.bundledEngine != nil {
+                    Picker("Engine", selection: $model.useBundledEngine) {
+                        Text("Built-in" + (AppModel.bundledEngineVersion.map { " (\($0))" } ?? "")).tag(true)
+                        Text("Grizzly checkout (developers)").tag(false)
+                    }
+                }
+                if !model.usingBundledEngine {
+                    LabeledContent("Grizzly folder") {
+                        HStack {
+                            Text(model.engineDirectory)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Button("Choose…") { chooseEngineFolder(model) }
+                        }
                     }
                 }
                 Picker("Hardware profile", selection: $model.profile) {
