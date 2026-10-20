@@ -1,7 +1,6 @@
 #if os(macOS)
 import AVKit  // the macOS 27 SDK's AVKit has its own `State`, hence `@SwiftUI.State` below
 import GrizzlyCore
-import Observation
 import SwiftUI
 
 struct StoryboardTab: View {
@@ -284,18 +283,10 @@ struct ShotInspector: View {
 
 // MARK: Export
 
-@MainActor
-@Observable
-final class PlayerHolder {
-    var player: AVPlayer?
-}
-
 struct ExportTab: View {
     @Environment(AppModel.self) private var model
     var project: Project
-    // A reference holder: loadPlayer() changes the holder, never the view, which
-    // the macOS 27 SDK compiler refuses here as "self is immutable".
-    @SwiftUI.State private var animatic = PlayerHolder()
+    @SwiftUI.State private var animaticPlayer: AVPlayer?
 
     private var exports: Exports? { model.exports }
     private var busy: Bool { model.isBusy(project.id) }
@@ -352,8 +343,8 @@ struct ExportTab: View {
                     open: { model.open(exports?.animatic.mp4) },
                     reveal: { model.reveal(exports?.animatic.mp4) }
                 ) {
-                    if let player = animatic.player {
-                        VideoPlayer(player: player)
+                    if let animaticPlayer {
+                        VideoPlayer(player: animaticPlayer)
                             .aspectRatio(16 / 9, contentMode: .fit)
                             .frame(maxWidth: 720)
                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -368,15 +359,15 @@ struct ExportTab: View {
         .onAppear(perform: loadPlayer)
         .onChange(of: model.mediaVersion) { _, _ in loadPlayer() }
         .onChange(of: exports?.animatic.mp4) { _, _ in loadPlayer() }
-        .onDisappear { animatic.player?.pause() }
+        .onDisappear { animaticPlayer?.pause() }
     }
 
     private func loadPlayer() {
-        animatic.player?.pause()
+        animaticPlayer?.pause()
         if let path = exports?.animatic.mp4, let url = model.fileURL(path) {
-            animatic.player = AVPlayer(url: url)
+            animaticPlayer = AVPlayer(url: url)
         } else {
-            animatic.player = nil
+            animaticPlayer = nil
         }
     }
 }
