@@ -114,7 +114,12 @@ def main(argv: list[str] | None = None) -> int:
         from grizzly.server import create_app
 
         print(f"Grizzly studio on http://{args.host}:{args.port} (profile {profile.name})")
-        uvicorn.run(create_app(profile, store), host=args.host, port=args.port, log_level="warning")
+        # Clients such as the Mac app keep connections alive; without a
+        # graceful-shutdown timeout, SIGTERM waits on them forever.
+        uvicorn.run(
+            create_app(profile, store), host=args.host, port=args.port, log_level="warning",
+            timeout_graceful_shutdown=2,
+        )
     return 0
 
 

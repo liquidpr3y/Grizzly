@@ -80,7 +80,7 @@ class Jobs:
     def submit(self, project_id: str, step: str, req: StepRequest) -> dict:
         job = {
             "id": uuid.uuid4().hex[:12], "project": project_id, "step": step, "state": "queued",
-            "progress": "", "result": None, "error": None, "created": time.time(), "finished": None,
+            "stage": step, "progress": "", "result": None, "error": None, "created": time.time(), "finished": None,
         }
         self.jobs[job["id"]] = job
         self.q.put((job, req))
@@ -97,7 +97,10 @@ class Jobs:
             try:
                 kw = dict(n_scenes=req.scenes, n_shots=req.shots)
                 if job["step"] == "all":
-                    out = self.pipeline.run_all(job["project"], progress=lambda s, job=job: job.update(progress=s), **kw)
+                    out = self.pipeline.run_all(
+                        job["project"], progress=lambda s, job=job: job.update(stage=s, progress=""),
+                        step_progress=progress, **kw,
+                    )
                 else:
                     out = self.pipeline.run(
                         job["project"], job["step"], force=req.force, only=set(req.only) if req.only else None,

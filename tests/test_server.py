@@ -76,3 +76,12 @@ def test_app_api_summaries_patches_exports_and_edit_lock(store):
 
     assert client.delete(f"/api/projects/{pid}").json() == {"deleted": pid}
     assert client.get(f"/api/projects/{pid}").status_code == 404
+
+
+def test_jobs_report_their_stage(store):
+    client = TestClient(create_app(load_profile("mock"), store))
+    pid = client.post("/api/projects", json={"title": "Stages", "premise": "p", "format": "comic"}).json()["id"]
+    job = wait(client, client.post(f"/api/projects/{pid}/steps/all", json={"scenes": 1, "shots": 3}).json()["id"])
+    # A full run ends on its export step; single steps report their own name.
+    assert job["state"] == "done" and job["stage"] == "comic"
+    assert wait(client, client.post(f"/api/projects/{pid}/steps/vn").json()["id"])["stage"] == "vn"

@@ -117,7 +117,13 @@ class Pipeline:
             return build_animatic(project, root)
         raise ValueError(f"Unknown step {step!r}. Steps: {', '.join(STEPS)}")
 
-    def run_all(self, project_id: str, progress: Callable[[str], None] | None = None, **kw) -> Path:
+    def run_all(
+        self,
+        project_id: str,
+        progress: Callable[[str], None] | None = None,
+        step_progress: Progress | None = None,
+        **kw,
+    ) -> Path:
         """Write and render whatever is missing, then build the format's export.
         Writes a timing/memory report to <project>/run_report.json."""
         project = self.store.load(project_id)
@@ -135,7 +141,7 @@ class Pipeline:
             if progress:
                 progress(step)
             t = time.time()
-            result = self.run(project_id, step, **kw)
+            result = self.run(project_id, step, progress=step_progress, **kw)
             entry = {"step": step, "seconds": round(time.time() - t, 1), "peak_gb": _round(peak_memory_gb())}
             if step in WRITE_STEPS:
                 entry["writer_retries"] = self.last_failed_attempts
