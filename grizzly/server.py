@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import logging
 import queue
+import shutil
 import threading
+import time
 import traceback
 import uuid
 from pathlib import Path
@@ -20,7 +22,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from grizzly.config import Profile
-from grizzly.models import Format, Project
+from grizzly import __version__
+from grizzly.models import DialogueLine, Format, Project
 from grizzly.pipeline import STEPS, Pipeline
 from grizzly.store import ProjectStore
 
@@ -45,6 +48,28 @@ class StepRequest(BaseModel):
     reroll: bool = False
 
 
+class BiblePatch(BaseModel):
+    title: str | None = None
+    logline: str | None = None
+    tone: str | None = None
+    art_style: str | None = None
+
+
+class CharacterPatch(BaseModel):
+    name: str | None = None
+    personality: str | None = None
+    appearance: str | None = None
+    voice: str | None = None
+
+
+class ShotPatch(BaseModel):
+    action: str | None = None
+    framing: str | None = None
+    narration: str | None = None
+    dialogue: list[DialogueLine] | None = None
+    duration: float | None = None
+
+
 class Jobs:
     def __init__(self, pipeline: Pipeline) -> None:
         self.pipeline = pipeline
@@ -53,7 +78,10 @@ class Jobs:
         threading.Thread(target=self._worker, daemon=True).start()
 
     def submit(self, project_id: str, step: str, req: StepRequest) -> dict:
-        job = {"id": uuid.uuid4().hex[:12], "project": project_id, "step": step, "state": "queued", "progress": "", "result": None, "error": None}
+        job = {
+            "id": uuid.uuid4().hex[:12], "project": project_id, "step": step, "state": "queued",
+            "progress": "", "result": None, "error": None, "created": time.time(), "finished": None,
+        }
         self.jobs[job["id"]] = job
         self.q.put((job, req))
         return job
@@ -82,11 +110,16 @@ class Jobs:
             except Exception as exc:  # surfaced to the UI
                 log.error("Job %s failed\n%s", job["id"], traceback.format_exc())
                 job["state"], job["error"] = "failed", str(exc)
+            job["finished"] = time.time()
+
+    def busy(self, project_id: str) -> bool:
+        return any(j["project"] == project_id and j["state"] in ("queued", "running") for j in self.jobs.values())
 
 
 def create_app(profile: Profile, store: ProjectStore) -> FastAPI:
     app = FastAPI(title="Grizzly")
     jobs = Jobs(Pipeline(profile, store))
+    app.state.jobs = jobs
 
     def load(pid: str) -> Project:
         try:
@@ -98,13 +131,48 @@ def create_app(profile: Profile, store: ProjectStore) -> FastAPI:
     def index():
         return FileResponse(WEB / "index.html")
 
+    def editable(pid: str) -> Project:
+        project = load(pid)
+        # The render worker saves its own copy as it goes; an edit made now
+        # would be overwritten, so refuse it until the job finishes.
+        if jobs.busy(pid):
+            raise HTTPException(409, "A job is running on this project; edit when it finishes")
+        return project
+
+    def summary(project: Project) -> dict:
+        cover = next((s.image for s in project.shots if s.image and s.framing == "wide"), None) or next(
+            (s.image for s in project.shots if s.image), None
+        )
+        if not cover and project.bible:
+            cover = next((c.portrait for c in project.bible.characters if c.portrait), None)
+        return {
+            "id": project.id, "title": project.title, "format": project.format, "created": project.created,
+            "logline": project.bible.logline if project.bible else "", "cover": cover,
+            "shots": len(project.shots), "status": project.status(), "busy": jobs.busy(project.id),
+        }
+
+    @app.get("/api/health")
+    def health():
+        return {"ok": True, "version": __version__, "profile": profile.name}
+
     @app.get("/api/info")
     def info():
-        return {"profile": profile.name, "llm": profile.llm_model, "image": profile.image_model, "steps": STEPS}
+        return {
+            "profile": profile.name, "llm": profile.llm_model, "image": profile.image_model,
+            "ref": profile.ref_model, "video": profile.video_model, "steps": STEPS,
+            # Lets a native front end reveal exports in Finder.
+            "projects_dir": str(store.base.resolve()),
+        }
 
     @app.get("/api/projects")
     def list_projects():
-        return store.list()
+        items = []
+        for item in store.list():
+            try:
+                items.append(summary(store.load(item["id"])))
+            except Exception:  # a damaged project should not hide the rest
+                log.exception("Could not load project %s", item["id"])
+        return sorted(items, key=lambda p: p["created"], reverse=True)
 
     @app.post("/api/projects")
     def new_project(body: NewProject):
@@ -113,15 +181,75 @@ def create_app(profile: Profile, store: ProjectStore) -> FastAPI:
     @app.get("/api/projects/{pid}")
     def get_project(pid: str):
         project = load(pid)
-        return {"project": project, "status": project.status()}
+        return {"project": project, "status": project.status(), "busy": jobs.busy(pid)}
 
     @app.put("/api/projects/{pid}")
     def put_project(pid: str, project: Project):
-        load(pid)
+        editable(pid)
         if project.id != pid:
             raise HTTPException(400, "Project id cannot change")
         store.save(project)
-        return {"project": project, "status": project.status()}
+        return {"project": project, "status": project.status(), "busy": False}
+
+    @app.delete("/api/projects/{pid}")
+    def delete_project(pid: str):
+        editable(pid)
+        shutil.rmtree(store.root(pid))
+        return {"deleted": pid}
+
+    @app.patch("/api/projects/{pid}/bible")
+    def patch_bible(pid: str, body: BiblePatch):
+        project = editable(pid)
+        if not project.bible:
+            raise HTTPException(409, "No story bible yet")
+        for key, value in body.model_dump(exclude_none=True).items():
+            setattr(project.bible, key, value)
+        store.save(project)
+        return {"project": project, "status": project.status(), "busy": False}
+
+    @app.patch("/api/projects/{pid}/characters/{cid}")
+    def patch_character(pid: str, cid: str, body: CharacterPatch):
+        project = editable(pid)
+        character = project.bible.character(cid) if project.bible else None
+        if not character:
+            raise HTTPException(404, f"No character {cid!r}")
+        for key, value in body.model_dump(exclude_none=True).items():
+            setattr(character, key, value)
+        store.save(project)
+        return {"project": project, "status": project.status(), "busy": False}
+
+    @app.patch("/api/projects/{pid}/shots/{sid}")
+    def patch_shot(pid: str, sid: str, body: ShotPatch):
+        project = editable(pid)
+        shot = next((s for s in project.shots if s.id == sid), None)
+        if not shot:
+            raise HTTPException(404, f"No shot {sid!r}")
+        data = body.model_dump(exclude_none=True)
+        if "framing" in data:
+            # Reuse the model's normalisation ("Close Up" -> "close-up").
+            data["framing"] = type(shot)(id="x", scene_id="x", action="x", framing=data["framing"]).framing
+        for key, value in data.items():
+            setattr(shot, key, value)
+        store.save(project)
+        return {"project": project, "status": project.status(), "busy": False}
+
+    @app.get("/api/projects/{pid}/exports")
+    def exports(pid: str):
+        load(pid)
+        root = store.root(pid)
+
+        def rel(path: Path) -> str | None:
+            return str(path.relative_to(root)) if path.exists() else None
+
+        comic = root / "exports" / "comic"
+        return {
+            "comic": {
+                "pdf": rel(comic / f"{pid}.pdf"),
+                "pages": sorted(str(p.relative_to(root)) for p in comic.glob("page_*.png")),
+            },
+            "vn": {"html": rel(root / "exports" / "vn_html" / "index.html"), "renpy": rel(root / "exports" / "renpy" / "game" / "script.rpy")},
+            "animatic": {"mp4": rel(root / "exports" / "animatic" / f"{pid}.mp4")},
+        }
 
     @app.post("/api/projects/{pid}/steps/{step}")
     def run_step(pid: str, step: str, req: StepRequest | None = None):
@@ -131,8 +259,8 @@ def create_app(profile: Profile, store: ProjectStore) -> FastAPI:
         return jobs.submit(pid, step, req or StepRequest())
 
     @app.get("/api/jobs")
-    def list_jobs():
-        return list(jobs.jobs.values())
+    def list_jobs(project: str | None = None):
+        return [j for j in jobs.jobs.values() if project is None or j["project"] == project]
 
     @app.get("/api/jobs/{jid}")
     def get_job(jid: str):
