@@ -13,6 +13,16 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+
+# From the macOS 27 SDK, SwiftUI's @State is a macro whose plugin ships with
+# Xcode; the Command Line Tools alone fail with "plugin for module
+# 'SwiftUIMacros' not found".
+if [[ "$(xcode-select -p 2>/dev/null)" == *CommandLineTools* ]]; then
+    echo "Building Grizzly needs Xcode, not just the Command Line Tools." >&2
+    echo "Install Xcode from the App Store, then run:" >&2
+    echo "  sudo xcode-select -s /Applications/Xcode.app/Contents/Developer && sudo xcodebuild -license accept" >&2
+    exit 1
+fi
 MODE="${1:-}"
 IDENTITY="${GRIZZLY_SIGN_IDENTITY:--}"
 
