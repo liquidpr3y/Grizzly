@@ -1,12 +1,12 @@
 #if os(macOS)
-import AVKit
+import AVKit  // the macOS 27 SDK's AVKit has its own `State`, hence `@SwiftUI.State` below
 import GrizzlyCore
 import SwiftUI
 
 struct StoryboardTab: View {
     @Environment(AppModel.self) private var model
     var project: Project
-    @State private var selectedShot: String?
+    @SwiftUI.State private var selectedShot: String?
 
     var body: some View {
         if project.shots.isEmpty {
@@ -72,7 +72,7 @@ struct ShotCard: View {
     @Environment(AppModel.self) private var model
     var shot: Shot
     var selected: Bool
-    @State private var hovering = false
+    @SwiftUI.State private var hovering = false
 
     var body: some View {
         NodePanel(title: shot.id, symbol: "rectangle.on.rectangle", type: shot.video == nil ? .image : .video,
@@ -119,11 +119,11 @@ struct ShotInspector: View {
     @Environment(AppModel.self) private var model
     var shot: Shot
     var project: Project
-    @State private var action = ""
-    @State private var framing: Framing = .medium
-    @State private var narration = ""
-    @State private var dialogue: [DialogueLine] = []
-    @State private var player: AVPlayer?
+    @SwiftUI.State private var action = ""
+    @SwiftUI.State private var framing: Framing = .medium
+    @SwiftUI.State private var narration = ""
+    @SwiftUI.State private var dialogue: [DialogueLine] = []
+    @SwiftUI.State private var player: AVPlayer?
 
     private var busy: Bool { model.isBusy(project.id) }
     private var changed: Bool {
@@ -286,7 +286,7 @@ struct ShotInspector: View {
 struct ExportTab: View {
     @Environment(AppModel.self) private var model
     var project: Project
-    @State private var animaticPlayer: AVPlayer?
+    @SwiftUI.State private var animaticPlayer: AVPlayer?
 
     private var exports: Exports? { model.exports }
     private var busy: Bool { model.isBusy(project.id) }
