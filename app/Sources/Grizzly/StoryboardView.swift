@@ -364,7 +364,11 @@ struct ExportTab: View {
 
     private func loadPlayer() {
         animaticPlayer?.pause()
-        animaticPlayer = exports?.animatic.mp4.flatMap { model.fileURL($0) }.map { AVPlayer(url: $0) }
+        if let path = exports?.animatic.mp4, let url = model.fileURL(path) {
+            animaticPlayer = AVPlayer(url: url)
+        } else {
+            animaticPlayer = nil
+        }
     }
 }
 
