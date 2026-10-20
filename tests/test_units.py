@@ -187,3 +187,28 @@ def test_wan_backend_passes_the_panel_and_settings_to_mlx_video(monkeypatch, tmp
 
     p = load_profile("m5pro-24gb")
     assert p.video_size[0] % 32 == 0 and p.video_size[1] % 32 == 0 and (p.video_frames - 1) % 4 == 0
+
+
+def test_clip_motion_separates_moving_from_frozen(tmp_path):
+    import shutil
+    import subprocess
+
+    import pytest
+    from PIL import Image, ImageDraw
+
+    from grizzly.motion import STATIC_THRESHOLD, clip_motion
+    from grizzly.video.mock import MockVideoModel
+
+    if not shutil.which("ffmpeg"):
+        pytest.skip("ffmpeg not installed")
+    img = Image.new("RGB", (640, 360), "white")
+    draw = ImageDraw.Draw(img)
+    for x in range(0, 640, 16):  # detail, so a zoom visibly changes pixels
+        draw.line([(x, 0), (x, 360)], fill="black", width=3)
+    img.save(tmp_path / "p.png")
+    MockVideoModel().generate("x", tmp_path / "p.png", 1, 320, 192, 25, tmp_path / "zoom.mp4")
+    subprocess.run(
+        ["ffmpeg", "-y", "-loop", "1", "-i", str(tmp_path / "p.png"), "-t", "1", "-vf", "scale=320:192,format=yuv420p",
+         str(tmp_path / "still.mp4")], check=True, capture_output=True,
+    )
+    assert clip_motion(tmp_path / "zoom.mp4") > STATIC_THRESHOLD > clip_motion(tmp_path / "still.mp4")

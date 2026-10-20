@@ -142,6 +142,11 @@ def load_profile(name: str | None = None) -> Profile:
     ):
         if os.environ.get(env):
             overrides[key] = cast(os.environ[env])
+    if os.environ.get("GRIZZLY_VIDEO_SIZE"):
+        w, h = (int(v) for v in os.environ["GRIZZLY_VIDEO_SIZE"].lower().split("x"))
+        if w % 32 or h % 32:
+            raise ValueError("GRIZZLY_VIDEO_SIZE sides must be multiples of 32, e.g. 1280x704")
+        overrides["video_size"] = (w, h)
     if os.environ.get("GRIZZLY_REFS", "").lower() in ("0", "off", "false", "no"):
         overrides["ref_backend"] = ""
     return replace(profile, **overrides) if overrides else profile

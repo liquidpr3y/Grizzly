@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import platform
 import shutil
 import sys
@@ -147,7 +148,7 @@ def run_doctor(
                 model = create_video_model(profile)
                 # Small and short: enough to measure speed and memory and
                 # check the clip moves, without a long wait.
-                w, h, frames = 512, 288, 25
+                w, h, frames = (512, 288, 25) if not os.environ.get("GRIZZLY_VIDEO_SIZE") else (*profile.video_size, profile.video_frames)
                 peak_memory_gb()
                 t = time.time()
                 path = model.generate(
@@ -157,6 +158,13 @@ def run_doctor(
                 )
                 secs = time.time() - t
                 _ok(f"{w}x{h} x {frames} frames", f"{secs:.0f}s {_peak_gb()}  -> {path}")
+                from grizzly.motion import STATIC_THRESHOLD, clip_motion
+
+                score = clip_motion(path)
+                if score < STATIC_THRESHOLD:
+                    print(f"  WARN  motion {score:.3f}: the clip is essentially a still image")
+                else:
+                    _ok("motion", f"{score:.3f} (first vs last frame)")
                 w2, h2 = profile.video_size
                 scale = (w2 * h2 * profile.video_frames) / (w * h * frames)
                 print(f"  ..    rough estimate for a {w2}x{h2} x {profile.video_frames}-frame clip: "

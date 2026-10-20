@@ -7,8 +7,12 @@ reference portraits gave them; the prompt only has to describe motion.
 from __future__ import annotations
 
 import logging
+import subprocess
+import tempfile
 from pathlib import Path
 from typing import Callable
+
+from PIL import Image, ImageChops, ImageStat
 
 from grizzly.config import Profile
 from grizzly.models import Project, Shot
@@ -22,6 +26,25 @@ CAMERA = {
     "medium": "gentle camera push-in",
     "close-up": "very slight camera push-in, shallow depth of field",
 }
+
+
+# Mean absolute pixel change between first and last frame, as a fraction of
+# full scale. Below this a clip reads as a still image.
+STATIC_THRESHOLD = 0.02
+
+
+def clip_motion(path: Path) -> float:
+    """How much a clip changes from its first frame to its last (0..1)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        first, last = Path(tmp) / "first.png", Path(tmp) / "last.png"
+        for args, out in ((["-i", str(path)], first), (["-sseof", "-0.1", "-i", str(path)], last)):
+            subprocess.run(
+                ["ffmpeg", "-y", *args, "-frames:v", "1", "-update", "1", str(out)],
+                check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+            )
+        a = Image.open(first).convert("L")
+        b = Image.open(last).convert("L").resize(a.size)
+        return ImageStat.Stat(ImageChops.difference(a, b)).mean[0] / 255
 
 
 def motion_prompt(project: Project, shot: Shot) -> str:
@@ -77,6 +100,11 @@ def render_videos(
             shot.video = None
         else:
             shot.video = str(path.relative_to(root))
+            score = clip_motion(path)
+            if score < STATIC_THRESHOLD:
+                log.warning("Clip %s barely moves (motion %.3f); try a larger size or --reroll", shot.id, score)
+            else:
+                log.info("Clip %s motion %.3f", shot.id, score)
         if on_each:
             on_each()
     if failed:
