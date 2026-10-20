@@ -25,10 +25,13 @@ struct StoryboardTab: View {
                     ForEach(Array(scenes.enumerated()), id: \.element.id) { index, scene in
                         VStack(alignment: .leading, spacing: 12) {
                             HStack(alignment: .firstTextBaseline, spacing: 10) {
-                                Text("Scene \(index + 1)")
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(Theme.accent)
-                                Text(scene.title).font(.title3.weight(.semibold))
+                                Text("SCENE \(index + 1)")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(Theme.typeText)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3)
+                                    .background(Theme.typeText.opacity(0.12), in: Capsule())
+                                Text(scene.title).font(.system(size: 17, weight: .semibold))
                             }
                             Text(scene.summary)
                                 .font(.callout)
@@ -45,10 +48,12 @@ struct StoryboardTab: View {
                 }
                 .padding(24)
             }
+            .background(DotGrid())
             .inspector(isPresented: Binding(get: { selectedShot != nil }, set: { if !$0 { selectedShot = nil } })) {
                 if let id = selectedShot, let shot = project.shots.first(where: { $0.id == id }) {
                     ShotInspector(shot: shot, project: project)
                         .id(shot.id)
+                        .background(Theme.panel)
                         .inspectorColumnWidth(min: 340, ideal: 400, max: 560)
                 }
             }
@@ -70,38 +75,40 @@ struct ShotCard: View {
     @State private var hovering = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            AspectImage(url: shot.image.flatMap { model.fileURL($0) }, ratio: 16 / 10)
-                .overlay(alignment: .topLeading) {
-                    HStack(spacing: 5) {
-                        Badge(text: shot.framing.title)
-                        if shot.video != nil {
-                            Badge(text: "Clip", symbol: "play.fill", tint: Theme.accent)
-                        }
-                    }
-                    .padding(8)
+        NodePanel(title: shot.id, symbol: "rectangle.on.rectangle", type: shot.video == nil ? .image : .video,
+                  highlighted: hovering, selected: selected) {
+            HStack(spacing: 5) {
+                if shot.video != nil {
+                    Image(systemName: "play.fill").font(.system(size: 9)).foregroundStyle(Theme.typeVideo)
                 }
-            Text(shot.action)
-                .font(.callout)
-                .lineLimit(3)
-            if let line = shot.dialogue.first {
-                Text("“\(line.text)”")
-                    .font(.caption)
-                    .italic()
+                Text(shot.framing.title)
+                    .font(.system(size: 10.5, weight: .medium))
                     .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            } else if !shot.narration.isEmpty {
-                Text(shot.narration)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
             }
-            Text(shot.id)
-                .font(.caption2.monospaced())
-                .foregroundStyle(.tertiary)
+        } content: {
+            VStack(alignment: .leading, spacing: 8) {
+                AspectImage(url: shot.image.flatMap { model.fileURL($0) }, ratio: 16 / 10, cornerRadius: 0)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(shot.action)
+                        .font(.system(size: 12))
+                        .lineLimit(3)
+                    if let line = shot.dialogue.first {
+                        Text("“\(line.text)”")
+                            .font(.system(size: 11))
+                            .italic()
+                            .foregroundStyle(Theme.typeText)
+                            .lineLimit(2)
+                    } else if !shot.narration.isEmpty {
+                        Text(shot.narration)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.bottom, 10)
+            }
         }
-        .padding(10)
-        .card(highlighted: hovering, selected: selected)
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.12), value: hovering)
@@ -348,6 +355,7 @@ struct ExportTab: View {
             .frame(maxWidth: 1000, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
+        .background(DotGrid())
         .onAppear(perform: loadPlayer)
         .onChange(of: model.mediaVersion) { _, _ in loadPlayer() }
         .onChange(of: exports?.animatic.mp4) { _, _ in loadPlayer() }
@@ -372,35 +380,27 @@ struct ExportCard<Preview: View>: View {
     @ViewBuilder var preview: () -> Preview
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 14) {
-                Image(systemName: symbol)
-                    .font(.title2)
-                    .foregroundStyle(Theme.accent)
-                    .frame(width: 44, height: 44)
-                    .background(Theme.accent.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 8) {
-                        Text(title).font(.headline)
-                        if available {
-                            Badge(text: "Ready", symbol: "checkmark", tint: .green)
-                        }
-                    }
-                    Text(detail).font(.callout).foregroundStyle(.secondary)
-                }
-                Spacer()
-                if available {
-                    Button("Show in Finder", action: reveal)
-                    Button("Open", action: open)
-                }
-                Button(available ? "Rebuild" : "Build", action: build)
-                    .buttonStyle(.borderedProminent)
-                    .disabled(disabled)
+        NodePanel(title: title, symbol: symbol, type: .file) {
+            if available {
+                Badge(text: "Ready", symbol: "checkmark", tint: Theme.typeFile)
             }
-            preview()
+        } content: {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 10) {
+                    Text(detail).font(.callout).foregroundStyle(.secondary)
+                    Spacer()
+                    if available {
+                        Button("Show in Finder", action: reveal)
+                        Button("Open", action: open)
+                    }
+                    Button(available ? "Rebuild" : "Build", action: build)
+                        .buttonStyle(.borderedProminent)
+                        .disabled(disabled)
+                }
+                preview()
+            }
+            .padding(14)
         }
-        .padding(16)
-        .card()
     }
 }
 #endif

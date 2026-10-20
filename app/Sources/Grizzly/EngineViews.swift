@@ -9,11 +9,11 @@ struct WelcomeView: View {
     var body: some View {
         VStack(spacing: 28) {
             VStack(spacing: 10) {
-                Image(systemName: "pawprint.fill")
-                    .font(.system(size: 54))
+                Image(systemName: "point.3.connected.trianglepath.dotted")
+                    .font(.system(size: 50, weight: .light))
                     .foregroundStyle(Theme.accent)
                 Text("Grizzly")
-                    .font(.system(size: 44, weight: .bold, design: .serif))
+                    .font(.system(size: 42, weight: .semibold))
                 Text("Write, cast and illustrate stories on this Mac.")
                     .font(.title3)
                     .foregroundStyle(.secondary)
@@ -38,6 +38,7 @@ struct WelcomeView: View {
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(DotGrid())
     }
 
     private func step(_ number: String, _ title: String, _ detail: String) -> some View {
@@ -45,7 +46,7 @@ struct WelcomeView: View {
             Text(number)
                 .font(.headline.monospacedDigit())
                 .frame(width: 28, height: 28)
-                .background(Theme.accent.opacity(0.2), in: Circle())
+                .background(Theme.accent.opacity(0.15), in: Circle())
                 .foregroundStyle(Theme.accent)
             Text(title).font(.headline)
             Text(detail).font(.callout).foregroundStyle(.secondary)
@@ -73,6 +74,7 @@ struct EngineStartingView: View {
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(DotGrid())
     }
 }
 
@@ -108,6 +110,7 @@ struct EngineFailedView: View {
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(DotGrid())
     }
 }
 
@@ -279,6 +282,7 @@ struct NewStorySheet: View {
         }
         .padding(28)
         .frame(width: 680)
+        .background(Theme.panel)
     }
 }
 

@@ -25,7 +25,8 @@ On first launch the app looks for the engine in `~/Grizzly/.venv`. If your check
 | Area | What it does |
 |---|---|
 | Library (sidebar) | Your stories with cover art; **New Story** (⌘N); right-click to delete. |
-| Pipeline bar | Story → Cast → Panels → Export, with live progress such as "Drawing panels · 7 of 16". |
+| Graph (default) | The story's pipeline as a node graph in the style of ComfyUI: Premise → Story Bible → Outline → Storyboard, with Cast and Storyboard both feeding Panels, then Clips and Exports. Wires are coloured by data type (text, image, video, file). Nodes show live status and previews. Click a node to open its tab; pinch or use the zoom control to zoom. |
+| Pipeline bar | Shown on the other tabs: Story → Cast → Panels → Export, with live progress such as "Drawing panels · 7 of 16". |
 | Story | Premise, genre and tone, editable art direction, scene outline. |
 | Cast | Character portraits with editable appearance and voice. **New Portrait** redraws one character with a fresh seed. |
 | Storyboard | Panels grouped by scene. Click one to open the inspector: edit the description, framing, narration and dialogue, then **Redraw**, **New Take** or **Animate**. Animated shots play inline. |

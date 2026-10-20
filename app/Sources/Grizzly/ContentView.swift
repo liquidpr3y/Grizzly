@@ -12,6 +12,7 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 250, ideal: 290, max: 380)
         } detail: {
             detail
+                .background(Theme.canvas)
         }
         .sheet(isPresented: $model.showNewStory) {
             NewStorySheet()
@@ -66,6 +67,8 @@ struct LibrarySidebar: View {
             }
         }
         .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
+        .background(Theme.panel)
         .overlay {
             if model.projects.isEmpty, model.engineState == .running {
                 ContentUnavailableView("No stories yet", systemImage: "books.vertical", description: Text("Create your first story below."))
@@ -85,7 +88,8 @@ struct LibrarySidebar: View {
                 EngineStatusBadge()
             }
             .padding(12)
-            .background(.bar)
+            .background(Theme.panel)
+            .overlay(alignment: .top) { Rectangle().fill(Theme.stroke).frame(height: 1) }
         }
         .confirmationDialog(
             "Delete “\(pendingDelete?.title ?? "")”?",
@@ -157,7 +161,7 @@ struct EngineStatusBadge: View {
 
     private var color: Color {
         switch model.engineState {
-        case .running: .green
+        case .running: Theme.accent
         case .starting, .stopped: .yellow
         case .failed: .red
         }
