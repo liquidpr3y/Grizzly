@@ -54,6 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--skip-llm", action="store_true")
     p.add_argument("--skip-image", action="store_true")
     p.add_argument("--skip-refs", action="store_true")
+    p.add_argument("--video", action="store_true", help="also test image-to-video (downloads ~20GB on first use)")
 
     p = sub.add_parser("serve", help="start the local web studio")
     p.add_argument("--host", default="127.0.0.1")
@@ -103,7 +104,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.cmd == "doctor":
         from grizzly.doctor import run_doctor
 
-        return run_doctor(profile, store.base.parent, args.skip_llm, args.skip_image, args.skip_refs, args.verbose)
+        return run_doctor(profile, store.base.parent, args.skip_llm, args.skip_image, args.skip_refs, args.verbose, args.video)
     elif args.cmd == "serve":
         try:
             import uvicorn

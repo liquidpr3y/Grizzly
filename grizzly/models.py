@@ -105,6 +105,9 @@ class Shot(BaseModel):
     image: str | None = None
     # Bumped to re-draw ("reroll") the shot with a fresh seed.
     seed_offset: int = 0
+    # Short animated clip made from `image` by the video step.
+    video: str | None = None
+    video_take: int = 0
 
     @field_validator("framing", mode="before")
     @classmethod

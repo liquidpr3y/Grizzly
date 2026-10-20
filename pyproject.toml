@@ -16,6 +16,11 @@ mac = [
     "mlx-lm>=0.32",
     "mflux>=0.23",
 ]
+# Image-to-video (Wan 2.2 TI2V-5B via mlx-video, MIT). Pinned: mlx-video has
+# no tagged release that includes Wan 2.2.
+video = [
+    "mlx-video @ git+https://github.com/Blaizzy/mlx-video@87db56a51758fefb748a359b90a5283bb8ba4837",
+]
 server = [
     "fastapi>=0.110",
     "uvicorn>=0.29",

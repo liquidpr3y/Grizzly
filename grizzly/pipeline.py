@@ -13,10 +13,12 @@ from grizzly.image import create_image_model, create_ref_model
 from grizzly.llm import create_llm
 from grizzly.memory import ModelManager, peak_memory_gb
 from grizzly.models import Project
+from grizzly.motion import render_videos
 from grizzly.render.animatic import build_animatic
 from grizzly.render.comic import build_comic
 from grizzly.render.vn import build_html_player, build_renpy
 from grizzly.store import ProjectStore
+from grizzly.video import create_video_model
 from grizzly.visuals import Progress, render_portraits, render_shots
 from grizzly.writer import Writer
 
@@ -24,8 +26,11 @@ log = logging.getLogger(__name__)
 
 WRITE_STEPS = ("bible", "outline", "shots")
 RENDER_STEPS = ("portraits", "images")
+# Image-to-video is slow on a laptop, so `run_all` leaves it out: animate the
+# shots you want with the `video` step and the animatic picks the clips up.
+VIDEO_STEP = "video"
 EXPORT_STEPS = ("comic", "vn", "animatic")
-STEPS = WRITE_STEPS + RENDER_STEPS + EXPORT_STEPS
+STEPS = WRITE_STEPS + RENDER_STEPS + (VIDEO_STEP,) + EXPORT_STEPS
 DEFAULT_EXPORT = {"comic": "comic", "vn": "vn", "film": "animatic"}
 
 
@@ -39,6 +44,8 @@ class Pipeline:
         self.models.register("image", lambda: create_image_model(profile))
         if profile.ref_backend:
             self.models.register("ref_image", lambda: create_ref_model(profile))
+        if profile.video_backend:
+            self.models.register("video", lambda: create_video_model(profile))
 
     def run(
         self,
@@ -90,6 +97,16 @@ class Pipeline:
                     on_each=lambda: self.store.save(project), use_refs=use_refs, reroll=reroll,
                 )
                 self.store.save(project)
+            return project
+        if step == VIDEO_STEP:
+            if not self.profile.video_backend:
+                raise RuntimeError(f"Profile {self.profile.name!r} has no video model")
+            model = self.models.acquire("video")
+            render_videos(
+                project, root, model, self.profile, force, only, reroll, progress,
+                on_each=lambda: self.store.save(project),
+            )
+            self.store.save(project)
             return project
         if step == "comic":
             return build_comic(project, root)
@@ -146,6 +163,7 @@ def _require(project: Project, step: str) -> None:
         "comic": ["images"],
         "vn": ["images"],
         "animatic": ["images"],
+        "video": ["images"],
     }
     status = project.status()
     missing = [n for n in needs.get(step, []) if not status[n]]

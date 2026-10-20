@@ -35,6 +35,13 @@ class Profile:
     # Portraits are downscaled to this longest side before use as references;
     # every reference adds tokens, so smaller is faster and lighter.
     ref_max_side: int = 512
+    # Image-to-video: animates a rendered panel into a short clip. Slow on
+    # laptops, so it is its own step rather than part of `run`.
+    video_backend: str = ""  # "mlx-video-wan" | "mock" | ""
+    video_model: str = ""
+    video_size: tuple[int, int] = (832, 480)  # multiples of 32, ~16:9
+    video_frames: int = 49  # 4n+1; ~2s at 24fps
+    video_steps: int = 30
     # Shot sizes per framing, kept to multiples of 16 for the diffusion VAE.
     sizes: dict[str, tuple[int, int]] = field(
         default_factory=lambda: {
@@ -49,6 +56,9 @@ class Profile:
 
 # FLUX.2 Klein 4B (Apache-2.0), pre-quantised to 4-bit: ~4.6GB, 4 steps.
 _KLEIN_REFS = dict(ref_backend="mflux-flux2", ref_model="mflux-community/flux2-klein-4b-mflux-q4")
+# Wan 2.2 TI2V-5B (Apache-2.0), 8-bit, via mlx-video: ~20GB download. The
+# 11GB text encoder is freed before the video model loads.
+_WAN_VIDEO = dict(video_backend="mlx-video-wan", video_model="Anes1032/Wan2.2-TI2V-5B-mlx-q8")
 
 PROFILES: dict[str, Profile] = {
     # ~5GB LLM + ~7GB diffusion (both 4-bit), swapped. Leaves headroom for
@@ -61,6 +71,7 @@ PROFILES: dict[str, Profile] = {
         image_model="filipstrand/Z-Image-Turbo-mflux-4bit",
         image_steps=9,
         **_KLEIN_REFS,
+        **_WAN_VIDEO,
     ),
     # Same machine, but the writer runs in an existing Ollama install.
     "m5pro-24gb-ollama": Profile(
@@ -71,6 +82,7 @@ PROFILES: dict[str, Profile] = {
         image_model="filipstrand/Z-Image-Turbo-mflux-4bit",
         image_steps=9,
         **_KLEIN_REFS,
+        **_WAN_VIDEO,
     ),
     # Machines with 48GB+ can keep both models loaded and use a bigger writer.
     "mac-48gb": Profile(
@@ -81,6 +93,7 @@ PROFILES: dict[str, Profile] = {
         image_model="filipstrand/Z-Image-Turbo-mflux-4bit",
         image_steps=9,
         **_KLEIN_REFS,
+        **_WAN_VIDEO,
         swap_models=False,
     ),
     # No ML at all: canned writer, placeholder art. Runs anywhere (CI, Linux).
@@ -94,6 +107,10 @@ PROFILES: dict[str, Profile] = {
         ref_backend="mock",
         ref_model="mock",
         ref_max_side=128,
+        video_backend="mock",
+        video_model="mock",
+        video_size=(320, 192),
+        video_frames=13,
         sizes={
             "wide": (672, 384),
             "medium": (512, 512),
@@ -119,6 +136,9 @@ def load_profile(name: str | None = None) -> Profile:
         ("GRIZZLY_IMAGE_MODEL", "image_model", str),
         ("GRIZZLY_IMAGE_STEPS", "image_steps", int),
         ("GRIZZLY_OLLAMA_URL", "ollama_url", str),
+        ("GRIZZLY_VIDEO_MODEL", "video_model", str),
+        ("GRIZZLY_VIDEO_FRAMES", "video_frames", int),
+        ("GRIZZLY_VIDEO_STEPS", "video_steps", int),
     ):
         if os.environ.get(env):
             overrides[key] = cast(os.environ[env])

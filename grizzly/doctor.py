@@ -30,7 +30,8 @@ def _peak_gb() -> str:
 
 
 def run_doctor(
-    profile: Profile, out_dir: Path, skip_llm: bool = False, skip_image: bool = False, skip_refs: bool = False, verbose: bool = False
+    profile: Profile, out_dir: Path, skip_llm: bool = False, skip_image: bool = False, skip_refs: bool = False, verbose: bool = False,
+    video: bool = False,
 ) -> int:
     failures = 0
     print(f"Grizzly doctor - profile {profile.name}")
@@ -130,6 +131,38 @@ def run_doctor(
                 release_accelerator_memory()
             except Exception as exc:
                 _fail("reference renderer", exc, verbose)
+                failures += 1
+
+    if video:
+        print(f"Video: {profile.video_backend} {profile.video_model} ({profile.video_steps} steps)")
+        src = out_dir / "doctor_512x512.png"
+        if not profile.video_backend:
+            print("  SKIP  this profile has no video model")
+        elif not src.exists():
+            print("  SKIP  needs doctor_512x512.png from the illustrator check; run without --skip-image once")
+        else:
+            try:
+                from grizzly.video import create_video_model
+
+                model = create_video_model(profile)
+                # Small and short: enough to measure speed and memory and
+                # check the clip moves, without a long wait.
+                w, h, frames = 512, 288, 25
+                peak_memory_gb()
+                t = time.time()
+                path = model.generate(
+                    "ink and watercolour comic art, the cat detective turns his head and looks around, "
+                    "fog drifting past the gas lamps, gentle camera push-in",
+                    src, 7, w, h, frames, out_dir / "doctor_video.mp4",
+                )
+                secs = time.time() - t
+                _ok(f"{w}x{h} x {frames} frames", f"{secs:.0f}s {_peak_gb()}  -> {path}")
+                w2, h2 = profile.video_size
+                scale = (w2 * h2 * profile.video_frames) / (w * h * frames)
+                print(f"  ..    rough estimate for a {w2}x{h2} x {profile.video_frames}-frame clip: "
+                      f"{secs * scale / 60:.0f} min (includes model loading, so likely an overestimate)")
+            except Exception as exc:
+                _fail("video", exc, verbose)
                 failures += 1
 
     print("All checks passed." if not failures else f"{failures} check(s) failed. Re-run with -v for tracebacks.")

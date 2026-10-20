@@ -6,3 +6,4 @@ __pycache__/
 # Default GRIZZLY_HOME is ~/Grizzly, which is often the clone itself.
 projects/
 doctor_*.png
+doctor_*.mp4

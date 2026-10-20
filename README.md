@@ -76,6 +76,21 @@ Other profiles: `m5pro-24gb-ollama` (the writer runs in an existing Ollama insta
 
 The portrait is what every shot copies, so check `images/characters/` before rendering shots. To re-draw one character's portrait with a fresh seed, run `grizzly step <id> portraits --only <character_id> --reroll`, or click **Save + new portrait** in the studio. Shots work the same way: `grizzly step <id> images --only <shot_id> --reroll`, or **New take**. If the model keeps getting a detail wrong, sharpen their appearance text first. Then run `grizzly step <id> images --force`.
 
+### Real video (image-to-video)
+
+The `video` step animates rendered panels into short clips with **Wan 2.2 TI2V-5B** (Apache-2.0) through [mlx-video](https://github.com/Blaizzy/mlx-video) (MIT). Each clip starts from the panel, so characters keep their reference look. The defaults are 832×480 and 49 frames (about 2 seconds at 24fps). The animatic uses a clip wherever a shot has one, holding its last frame while the voice-over finishes, and pans across the still panel everywhere else.
+
+```sh
+uv pip install -e '.[mac,server,video]'
+grizzly -v doctor --skip-llm --skip-image --skip-refs --video   # one short test clip: time + peak memory
+grizzly -v step <id> video --only s1_01 s2_03                   # animate chosen shots
+grizzly step <id> animatic
+```
+
+Video is slow on a laptop, so `run` never animates on its own. Pick the shots that matter. `--reroll` gives a shot a new take, and `GRIZZLY_VIDEO_FRAMES` / `GRIZZLY_VIDEO_STEPS` trade length and quality for time.
+
+**Licensing note.** Wan 2.2 was chosen over LTX-2.x for its licence. LTX runs well on Apple Silicon, but the LTX-2 Community License (Attachment A, clause 20) bars use in a product that "directly competes with Licensor's commercial products" (Lightricks sells LTX Studio) without a paid licence, and it charges companies with $10M+ revenue. Get legal advice before shipping any model.
+
 ## Roadmap
 
 **Phase 1: prototype (this repo).** Validate quality and speed on the M5 Pro.
@@ -83,7 +98,7 @@ The portrait is what every shot copies, so check `images/characters/` before ren
 **Phase 2: quality**
 - Per-character LoRAs trained locally from the portrait sheet (mflux supports LoRA training), applied automatically when a character is in shot.
 - Pose and layout control via ControlNet (Z-Image Turbo ControlNet Union is already in mflux).
-- Real image-to-video per shot (Wan 2.x 5B / LTX-Video class) replacing the Ken Burns clip in `render/animatic.py`.
+- Faster video: lower step counts, LightX2V-style step-distilled LoRAs for Wan, or a commercial licence for LTX.
 - Branching choices for visual novels; better bubble placement (face detection to point tails).
 
 **Phase 3: product.** The HTTP API in `grizzly/server.py` is the seam for either route:

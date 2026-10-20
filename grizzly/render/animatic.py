@@ -78,6 +78,22 @@ def _shot_clip(image: Path, audio: Path | None, duration: float, index: int, out
     ])
 
 
+def _video_clip(video: Path, audio: Path | None, duration: float, out: Path) -> None:
+    """Use a generated clip; hold its last frame if the voice-over runs longer."""
+    vf = (
+        f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},fps={FPS},"
+        f"tpad=stop_mode=clone:stop_duration={duration:.3f},format=yuv420p"
+    )
+    audio_in = ["-i", str(audio)] if audio else ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo"]
+    _run([
+        "ffmpeg", "-y", "-i", str(video), *audio_in,
+        "-filter_complex", f"[0:v]{vf}[v];[1:a]apad,aresample=44100[a]",
+        "-map", "[v]", "-map", "[a]", "-t", f"{duration:.3f}",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-r", str(FPS),
+        "-c:a", "aac", "-ar", "44100", "-ac", "2", str(out),
+    ])
+
+
 def _ts(t: float) -> str:
     ms = int(round(t * 1000))
     h, ms = divmod(ms, 3_600_000)
@@ -98,7 +114,10 @@ def build_animatic(project: Project, root: Path) -> Path:
         audio, durs = _voice(lines, work, shot.id)
         duration = max(shot.duration, sum(durs) + 0.5)
         clip = work / f"{shot.id}.mp4"
-        _shot_clip(root / shot.image, audio, duration, i, clip)
+        if shot.video and (root / shot.video).exists():
+            _video_clip(root / shot.video, audio, duration, clip)
+        else:
+            _shot_clip(root / shot.image, audio, duration, i, clip)
         clips.append(clip)
         if lines:
             durs = durs or [duration / len(lines)] * len(lines)

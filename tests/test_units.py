@@ -159,3 +159,31 @@ def test_reference_shots_warn_against_duplicates():
     shot = Shot(id="s", scene_id="s", action="Ann and Ben on deck", character_ids=["a", "b"], framing="wide")
     assert "never two copies" in shot_prompt(bible, shot, ref_ids=["a", "b"])
     assert "never two copies" not in shot_prompt(bible, shot)
+
+
+def test_wan_backend_passes_the_panel_and_settings_to_mlx_video(monkeypatch, tmp_path):
+    import sys
+    import types
+
+    calls = []
+    gen = types.ModuleType("mlx_video.models.wan_2.generate")
+    gen.generate_video = lambda **kw: calls.append(kw)
+    monkeypatch.setitem(sys.modules, "mlx_video", types.ModuleType("mlx_video"))
+    monkeypatch.setitem(sys.modules, "mlx_video.models", types.ModuleType("mlx_video.models"))
+    monkeypatch.setitem(sys.modules, "mlx_video.models.wan_2", types.ModuleType("mlx_video.models.wan_2"))
+    monkeypatch.setitem(sys.modules, "mlx_video.models.wan_2.generate", gen)
+
+    from grizzly.video.mlx_wan import MlxWanVideoModel
+
+    model_dir = tmp_path / "wan"
+    model_dir.mkdir()
+    out = MlxWanVideoModel(str(model_dir), 30).generate("p", tmp_path / "s.png", 5, 832, 480, 49, tmp_path / "v" / "s.mp4")
+    assert out == tmp_path / "v" / "s.mp4" and out.parent.exists()
+    kw = calls[0]
+    assert kw["model_dir"] == str(model_dir) and kw["image"] == str(tmp_path / "s.png")
+    assert (kw["width"], kw["height"], kw["num_frames"], kw["steps"], kw["seed"]) == (832, 480, 49, 30, 5)
+    # Wan constraints: sizes divisible by 32, frames of the form 4n+1.
+    from grizzly.config import load_profile
+
+    p = load_profile("m5pro-24gb")
+    assert p.video_size[0] % 32 == 0 and p.video_size[1] % 32 == 0 and (p.video_frames - 1) % 4 == 0

@@ -179,3 +179,25 @@ def test_run_all_writes_a_report(store, pipeline):
     assert images["count"] == 6
     assert all("writer_retries" in s for s in report["steps"][:3])
     assert report["total_seconds"] >= 0
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="ffmpeg not installed")
+def test_video_step_animates_shots_and_animatic_uses_the_clips(store, pipeline):
+    project = store.create("Lighthouse", "premise", "film")
+    pipeline.run_all(project.id, n_scenes=1, n_shots=2)
+    # run_all never animates: it is too slow to do implicitly.
+    assert not any(s.video for s in store.load(project.id).shots)
+    first = store.load(project.id).shots[0].id
+    pipeline.run(project.id, "video", only={first})
+    shots = store.load(project.id).shots
+    root = store.root(project.id)
+    assert shots[0].video and (root / shots[0].video).exists() and shots[1].video is None
+    call = pipeline.models.acquire("video").calls[0]
+    assert call["image"].endswith(f"{first}.png") and "move naturally" in call["prompt"]
+    mp4 = pipeline.run(project.id, "animatic")
+    dur = float(subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(mp4)],
+        capture_output=True, text=True, check=True,
+    ).stdout)
+    # The 13-frame clip is held on its last frame for the shot's full duration.
+    assert dur >= sum(s.duration for s in shots) - 0.5
