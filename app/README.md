@@ -44,11 +44,11 @@ While a job runs on a story, editing that story is locked. The engine saves its 
 - `Sources/Grizzly`: the SwiftUI app.
 - `Tests/GrizzlyCoreTests`: unit tests, plus an integration test that launches the real engine with mock models and drives a whole story through the client.
 
-- `scripts/bundle-engine.sh`: builds the self-contained engine; `scripts/make-app.sh`: builds and signs the app around it.
+- `scripts/bundle-engine.sh`: builds the self-contained engine; `scripts/make-app.sh`: builds and signs the app around it; `scripts/release.sh`: notarises it and makes the disk image.
 
 GrizzlyCore builds and is tested on Linux too: `GRIZZLY_ENGINE_DIR=/path/to/Grizzly swift test`. Add `GRIZZLY_BUNDLED_ENGINE=/path/to/engine` (from `GRIZZLY_EXTRAS=server scripts/bundle-engine.sh /path/to/engine`) to also run a story through a bundled engine and check it writes nothing into its own folder. The SwiftUI target compiles only on macOS; elsewhere it builds to a stub.
 
 ## Not done yet
 
-- **Distribution.** The app is self-contained but signed ad hoc, so it runs only on the Mac that built it. Shipping needs Developer ID signing with the hardened runtime, notarisation, and a licence review of everything bundled (the static ffmpeg is a GPL build).
+- **Distribution.** `scripts/release.sh` signs with a Developer ID, notarises and builds a disk image (see [RELEASING.md](RELEASING.md)). Still to do: automatic updates, and a licence review of everything bundled (the static ffmpeg is a GPL build).
 - App icon, a cancel button for running jobs, and editing the outline from the app.

@@ -25,6 +25,7 @@ final class EngineLayoutTests: XCTestCase {
         XCTAssertEqual(config.executable, python)
         XCTAssertEqual(config.arguments, ["-s", "-m", "grizzly", "serve", "--port", "9000", "--exit-with-parent"])
         XCTAssertEqual(config.layoutEnvironment["PYTHONDONTWRITEBYTECODE"], "1")
+        XCTAssertFalse(config.layoutEnvironment["NUMBA_CACHE_DIR"]!.hasPrefix(dir.path), "caches must live outside the bundle")
 
         let env = EngineProcess.environment(adding: config.layoutEnvironment.merging(["PYTHONPATH": "/x"]) { $1 }, layout: .bundled)
         XCTAssertTrue(env["PATH"]!.hasPrefix(dir.appendingPathComponent("bin").path + ":"))

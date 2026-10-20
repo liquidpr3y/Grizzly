@@ -50,9 +50,14 @@ public final class EngineProcess: @unchecked Sendable {
         /// Variables for the engine on top of the app's own environment.
         var layoutEnvironment: [String: String] {
             guard layout == .bundled else { return [:] }
+            // Anything written inside a signed app breaks its seal, and
+            // Gatekeeper then reports the app as damaged: keep caches out.
+            let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("app.grizzly.studio")
             return [
                 "PYTHONDONTWRITEBYTECODE": "1",
                 "PYTHONNOUSERSITE": "1",
+                "NUMBA_CACHE_DIR": caches.appendingPathComponent("numba").path,
                 "GRIZZLY_ENGINE_BIN": engineDirectory.appendingPathComponent("bin").path,
             ]
         }
