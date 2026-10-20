@@ -108,6 +108,27 @@ final class EngineIntegrationTests: XCTestCase {
         XCTAssertFalse(remaining.contains { $0.id == project.id })
     }
 
+    func testPortConflictFailsFastWithAnExplanation() async throws {
+        // `engine` from setUp already holds its port; a second engine on it must fail fast.
+        let second = EngineProcess(configuration: .init(
+            engineDirectory: engine.configuration.engineDirectory, port: engine.configuration.port, profile: "mock",
+            environment: ["GRIZZLY_HOME": home.path]
+        ))
+        try second.start()
+        let started = ContinuousClock.now
+        // A client that cannot reach anything, so only the exit check can end the wait.
+        let unreachable = EngineClient(port: 1)
+        do {
+            _ = try await waitForEngine(unreachable, process: second, timeout: .seconds(60))
+            XCTFail("expected a port conflict")
+        } catch let error as EngineProcess.LaunchError {
+            XCTAssertEqual(error, .portInUse(engine.configuration.port))
+            XCTAssertTrue(error.localizedDescription.contains("lsof"))
+        }
+        XCTAssertLessThan(ContinuousClock.now - started, .seconds(30))
+        second.stop()
+    }
+
     func testMissingEngineIsReported() {
         let process = EngineProcess(configuration: .init(engineDirectory: URL(fileURLWithPath: "/nonexistent")))
         XCTAssertThrowsError(try process.start()) { error in

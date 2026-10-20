@@ -83,7 +83,7 @@ final class AppModel {
         do {
             try process.start()
             engine = process
-            _ = try await waitForEngine(client, timeout: .seconds(120))
+            _ = try await waitForEngine(client, process: process, timeout: .seconds(120))
             await engineDidStart()
         } catch {
             process.stop()

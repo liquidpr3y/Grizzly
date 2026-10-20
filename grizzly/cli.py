@@ -17,6 +17,37 @@ def _progress(i: int, n: int, label: str) -> None:
     print(f"  [{i + 1}/{n}] {label}", flush=True)
 
 
+def _port_free(host: str, port: int) -> bool:
+    import socket
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        try:
+            sock.bind((host, port))
+        except OSError:
+            return False
+    return True
+
+
+def _exit_with_parent() -> None:
+    """Stop when the launching app dies. An app killed outright (e.g. stopped
+    from Xcode) never gets to stop its engine, which would otherwise keep
+    running and holding model memory and the port."""
+    import os
+    import signal
+    import threading
+
+    parent = os.getppid()
+
+    def watch() -> None:
+        while True:
+            time.sleep(1)
+            if os.getppid() != parent:
+                os.kill(os.getpid(), signal.SIGTERM)
+                return
+
+    threading.Thread(target=watch, daemon=True).start()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="grizzly", description="LLM-assisted comics, visual novels and animatics on Apple Silicon.")
     parser.add_argument("--profile", choices=sorted(PROFILES), help="hardware profile (default: $GRIZZLY_PROFILE or m5pro-24gb)")
@@ -59,6 +90,8 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("serve", help="start the local web studio")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8642)
+    p.add_argument("--exit-with-parent", action="store_true",
+                   help="exit when the launching process dies (used by the Mac app)")
 
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
@@ -113,6 +146,15 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         from grizzly.server import create_app
 
+        if not _port_free(args.host, args.port):
+            print(
+                f"PORT_IN_USE: {args.host}:{args.port} is already in use, most likely by a Grizzly engine "
+                f"left running from an earlier session. Find it with: lsof -nP -iTCP:{args.port} -sTCP:LISTEN",
+                file=sys.stderr,
+            )
+            return 3
+        if args.exit_with_parent:
+            _exit_with_parent()
         print(f"Grizzly studio on http://{args.host}:{args.port} (profile {profile.name})")
         # Clients such as the Mac app keep connections alive; without a
         # graceful-shutdown timeout, SIGTERM waits on them forever.

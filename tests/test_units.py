@@ -212,3 +212,49 @@ def test_clip_motion_separates_moving_from_frozen(tmp_path):
          str(tmp_path / "still.mp4")], check=True, capture_output=True,
     )
     assert clip_motion(tmp_path / "zoom.mp4") > STATIC_THRESHOLD > clip_motion(tmp_path / "still.mp4")
+
+
+def test_serve_refuses_a_busy_port_and_exits_with_its_parent(tmp_path):
+    import os
+    import socket
+    import subprocess
+    import sys
+    import time
+
+    import pytest
+
+    pytest.importorskip("uvicorn")
+    exe = [sys.executable, "-m", "grizzly.cli", "--profile", "mock", "serve"]
+    env = {**os.environ, "GRIZZLY_HOME": str(tmp_path)}
+
+    # A port someone else holds fails fast with a recognisable message.
+    with socket.socket() as busy:
+        busy.bind(("127.0.0.1", 0))
+        busy.listen()
+        port = busy.getsockname()[1]
+        out = subprocess.run([*exe, "--port", str(port)], env=env, capture_output=True, text=True, timeout=60)
+    assert out.returncode == 3 and "PORT_IN_USE" in out.stderr
+
+    # The engine stops on its own when the process that launched it dies.
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    pidfile = tmp_path / "engine.pid"
+    launcher = (
+        "import subprocess, sys, time\n"
+        f"p = subprocess.Popen({[*exe, '--port', str(port), '--exit-with-parent']!r}, env={env!r})\n"
+        f"open({str(pidfile)!r}, 'w').write(str(p.pid))\n"
+        "time.sleep(4)\n"  # then die without stopping the engine
+    )
+    subprocess.run([sys.executable, "-c", launcher], timeout=60)
+    engine = int(pidfile.read_text())
+    deadline = time.time() + 15
+    while time.time() < deadline:
+        try:
+            os.kill(engine, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.2)
+    else:
+        os.kill(engine, 9)
+        raise AssertionError("engine outlived its parent")
