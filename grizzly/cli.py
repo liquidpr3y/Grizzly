@@ -48,6 +48,45 @@ def _exit_with_parent() -> None:
     threading.Thread(target=watch, daemon=True).start()
 
 
+def _models(profile, download: bool, video: bool) -> int:
+    from grizzly.weights import GB, WeightStore, specs_for
+
+    specs, notes = specs_for(profile)
+    weights = WeightStore(specs)
+
+    def table() -> list[dict]:
+        rows = weights.status()
+        for m in rows:
+            mark = "ok" if m["complete"] else "missing" if m["state"] == "idle" else m["state"]
+            size = f"{m['downloaded_bytes'] / GB:.1f}/{m['size_bytes'] / GB:.1f} GB"
+            print(f"  {mark:12} {m['id']:10} {size:>15}  {m['repo']}{'' if m['required'] else '  (optional)'}")
+        return rows
+
+    print(f"Models for profile {profile.name} in {weights.cache}")
+    rows = table()
+    for note in notes:
+        print(f"  note: {note}")
+    if not download:
+        return 0 if all(m["complete"] for m in rows if m["required"]) else 1
+    ids = [m["id"] for m in rows if not m["complete"] and (m["required"] or video)]
+    if not ids:
+        print("Nothing to download.")
+        return 0
+    try:
+        weights.download(ids)
+    except ValueError as exc:
+        print(exc, file=sys.stderr)
+        return 1
+    while weights.busy():
+        time.sleep(2)
+        done = sum(m["downloaded_bytes"] for m in weights.status() if m["id"] in ids)
+        total = sum(m["size_bytes"] for m in weights.status() if m["id"] in ids)
+        print(f"\r  {done / GB:6.1f} / {total / GB:.1f} GB", end="", flush=True)
+    print()
+    rows = table()
+    return 0 if all(m["complete"] for m in rows if m["id"] in ids) else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="grizzly", description="LLM-assisted comics, visual novels and animatics on Apple Silicon.")
     parser.add_argument("--profile", choices=sorted(PROFILES), help="hardware profile (default: $GRIZZLY_PROFILE or m5pro-24gb)")
@@ -86,6 +125,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--skip-image", action="store_true")
     p.add_argument("--skip-refs", action="store_true")
     p.add_argument("--video", action="store_true", help="also test image-to-video (downloads ~20GB on first use)")
+
+    p = sub.add_parser("models", help="show which models the profile needs and download them")
+    p.add_argument("--download", action="store_true", help="download the required models that are missing")
+    p.add_argument("--video", action="store_true", help="with --download, also the optional video model")
 
     p = sub.add_parser("serve", help="start the local web studio")
     p.add_argument("--host", default="127.0.0.1")
@@ -138,6 +181,8 @@ def main(argv: list[str] | None = None) -> int:
         from grizzly.doctor import run_doctor
 
         return run_doctor(profile, store.base.parent, args.skip_llm, args.skip_image, args.skip_refs, args.verbose, args.video)
+    elif args.cmd == "models":
+        return _models(profile, args.download, args.video)
     elif args.cmd == "serve":
         try:
             import uvicorn

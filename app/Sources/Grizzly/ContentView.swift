@@ -31,7 +31,9 @@ struct ContentView: View {
     private var detail: some View {
         switch model.engineState {
         case .running:
-            if let envelope = model.current {
+            if model.showSetup, model.setup != nil {
+                SetupView()
+            } else if let envelope = model.current {
                 ProjectView(envelope: envelope)
                     .id(envelope.project.id)
             } else if model.selection != nil {
@@ -189,6 +191,16 @@ struct EngineInfoView: View {
                 row("Panels", info.ref.isEmpty ? info.image : info.ref)
                 row("Video", info.video.isEmpty ? "Off" : info.video)
                 row("Projects", info.projectsDir)
+                if let setup = model.setup {
+                    HStack {
+                        Text(setup.ready ? "All required models installed" : "Models still to download")
+                            .font(.caption)
+                            .foregroundStyle(setup.ready ? Color.secondary : Color.orange)
+                        Spacer()
+                        Button("Models…") { model.showSetup = true }
+                            .controlSize(.small)
+                    }
+                }
             } else {
                 Text("The engine is not connected.").foregroundStyle(.secondary)
             }
