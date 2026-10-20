@@ -42,7 +42,8 @@ public struct DialogueLine: Codable, Hashable, Sendable {
     }
 }
 
-public struct Character: Codable, Identifiable, Hashable, Sendable {
+/// Named StoryCharacter to avoid clashing with Swift.Character.
+public struct StoryCharacter: Codable, Identifiable, Hashable, Sendable {
     public var id: String
     public var name: String
     public var role: String
@@ -65,10 +66,10 @@ public struct StoryBible: Codable, Hashable, Sendable {
     public var genre: String
     public var tone: String
     public var artStyle: String
-    public var characters: [Character]
+    public var characters: [StoryCharacter]
     public var locations: [Location]
 
-    public func character(_ id: String) -> Character? { characters.first { $0.id == id } }
+    public func character(_ id: String) -> StoryCharacter? { characters.first { $0.id == id } }
     public func location(_ id: String) -> Location? { locations.first { $0.id == id } }
 }
 
@@ -78,6 +79,14 @@ public struct SceneOutline: Codable, Identifiable, Hashable, Sendable {
     public var summary: String
     public var locationId: String
     public var characterIds: [String]
+
+    public init(id: String, title: String, summary: String, locationId: String, characterIds: [String]) {
+        self.id = id
+        self.title = title
+        self.summary = summary
+        self.locationId = locationId
+        self.characterIds = characterIds
+    }
 }
 
 public struct Outline: Codable, Hashable, Sendable {

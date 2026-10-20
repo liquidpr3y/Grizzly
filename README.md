@@ -31,6 +31,10 @@ The first run downloads about 5GB for the writer and about 7GB for the illustrat
 
 To try it without any models: `GRIZZLY_PROFILE=mock grizzly run <id>`.
 
+## Mac app
+
+A native SwiftUI front end lives in [`app/`](app/README.md). It starts and stops the engine for you and gives you a library, a cast view, a storyboard with an inspector, live progress and export previews. Run it with `open app/Package.swift` in Xcode (⌘R) or `cd app && swift run Grizzly`.
+
 ## How it works
 
 ```
