@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import platform
 import shutil
 import sys
@@ -146,9 +145,8 @@ def run_doctor(
                 from grizzly.video import create_video_model
 
                 model = create_video_model(profile)
-                # Small and short: enough to measure speed and memory and
-                # check the clip moves, without a long wait.
-                w, h, frames = (512, 288, 25) if not os.environ.get("GRIZZLY_VIDEO_SIZE") else (*profile.video_size, profile.video_frames)
+                # Native size (smaller sizes freeze), but few frames to keep it short.
+                (w, h), frames = profile.video_size, 17
                 peak_memory_gb()
                 t = time.time()
                 path = model.generate(

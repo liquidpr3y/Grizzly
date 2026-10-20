@@ -39,8 +39,10 @@ class Profile:
     # laptops, so it is its own step rather than part of `run`.
     video_backend: str = ""  # "mlx-video-wan" | "mock" | ""
     video_model: str = ""
-    video_size: tuple[int, int] = (832, 480)  # multiples of 32, ~16:9
-    video_frames: int = 49  # 4n+1; ~2s at 24fps
+    # Wan 2.2 TI2V-5B is trained at 1280x704; well below that (512x288 was
+    # tried on the M5 Pro) its clips come out frozen. Multiples of 32.
+    video_size: tuple[int, int] = (1280, 704)
+    video_frames: int = 41  # 4n+1; ~1.7s at 24fps, verified on a 24GB M5 Pro
     video_steps: int = 30
     # Shot sizes per framing, kept to multiples of 16 for the diffusion VAE.
     sizes: dict[str, tuple[int, int]] = field(

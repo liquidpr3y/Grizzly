@@ -78,7 +78,7 @@ The portrait is what every shot copies, so check `images/characters/` before ren
 
 ### Real video (image-to-video)
 
-The `video` step animates rendered panels into short clips with **Wan 2.2 TI2V-5B** (Apache-2.0) through [mlx-video](https://github.com/Blaizzy/mlx-video) (MIT). Each clip starts from the panel, so characters keep their reference look. The defaults are 832×480 and 49 frames (about 2 seconds at 24fps). The animatic uses a clip wherever a shot has one, holding its last frame while the voice-over finishes, and pans across the still panel everywhere else.
+The `video` step animates rendered panels into short clips with **Wan 2.2 TI2V-5B** (Apache-2.0) through [mlx-video](https://github.com/Blaizzy/mlx-video) (MIT). Each clip starts from the panel, so characters keep their reference look. The defaults are 1280×704 (the model's native size; 512×288 came out frozen on the M5 Pro) and 41 frames (about 1.7 seconds at 24fps). The animatic uses a clip wherever a shot has one, holding its last frame while the voice-over finishes, and pans across the still panel everywhere else.
 
 ```sh
 uv pip install -e '.[mac,server,video]'
