@@ -38,6 +38,10 @@ grizzly = "grizzly.cli:main"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.metadata]
+# The video extra pins mlx-video to a git commit.
+allow-direct-references = true
+
 [tool.hatch.build.targets.wheel]
 packages = ["grizzly"]
 
