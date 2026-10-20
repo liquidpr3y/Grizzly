@@ -19,6 +19,7 @@ git clone https://github.com/liquidpr3y/Grizzly && cd Grizzly
 uv venv --python 3.12 && source .venv/bin/activate
 uv pip install -e '.[mac,server]'
 
+grizzly models --download   # fetches the profile's models (~15GB; add --video for the optional ~20GB video model)
 grizzly doctor          # checks MLX, then loads and tests each model on its own
 grizzly new "The Lighthouse Signal" "A young keeper discovers the lighthouse beam is answering something beneath the sea." --format comic
 grizzly -v run the_lighthouse_signal --scenes 3 --shots 4

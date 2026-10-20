@@ -26,6 +26,8 @@ from grizzly import __version__
 from grizzly.models import DialogueLine, Format, Project
 from grizzly.pipeline import STEPS, Pipeline
 from grizzly.store import ProjectStore
+from grizzly.system import system_info
+from grizzly.weights import WeightStore, specs_for
 
 log = logging.getLogger(__name__)
 WEB = Path(__file__).parent / "web"
@@ -68,6 +70,11 @@ class ShotPatch(BaseModel):
     narration: str | None = None
     dialogue: list[DialogueLine] | None = None
     duration: float | None = None
+
+
+class DownloadRequest(BaseModel):
+    # None: every required model that isn't downloaded yet.
+    models: list[str] | None = None
 
 
 class Jobs:
@@ -119,10 +126,14 @@ class Jobs:
         return any(j["project"] == project_id and j["state"] in ("queued", "running") for j in self.jobs.values())
 
 
-def create_app(profile: Profile, store: ProjectStore) -> FastAPI:
+def create_app(profile: Profile, store: ProjectStore, weights: WeightStore | None = None) -> FastAPI:
     app = FastAPI(title="Grizzly")
     jobs = Jobs(Pipeline(profile, store))
     app.state.jobs = jobs
+    specs, notes = specs_for(profile)
+    # The mock profile's stand-in models stay out of the real Hugging Face cache.
+    weights = weights or WeightStore(specs, cache=store.base.parent / "mock-models" if profile.name == "mock" else None)
+    app.state.weights = weights
 
     def load(pid: str) -> Project:
         try:
@@ -166,6 +177,34 @@ def create_app(profile: Profile, store: ProjectStore) -> FastAPI:
             # Lets a native front end reveal exports in Finder.
             "projects_dir": str(store.base.resolve()),
         }
+
+    def setup_status() -> dict:
+        models = weights.status()
+        missing = sum(max(0, m["size_bytes"] - m["downloaded_bytes"]) for m in models if m["required"] and not m["complete"])
+        return {
+            "profile": profile.name,
+            "system": system_info(weights.cache, missing),
+            "models": models,
+            "notes": notes,
+            "ready": all(m["complete"] for m in models if m["required"]),
+            "downloading": weights.busy(),
+            "cache_dir": str(weights.cache),
+        }
+
+    @app.get("/api/setup")
+    def setup():
+        """First-launch state: the hardware check and which models are installed."""
+        return setup_status()
+
+    @app.post("/api/setup/download")
+    def download(req: DownloadRequest | None = None):
+        try:
+            weights.download((req or DownloadRequest()).models)
+        except KeyError as exc:
+            raise HTTPException(404, f"No model {exc.args[0]!r} in profile {profile.name}")
+        except ValueError as exc:
+            raise HTTPException(507, str(exc))
+        return setup_status()
 
     @app.get("/api/projects")
     def list_projects():

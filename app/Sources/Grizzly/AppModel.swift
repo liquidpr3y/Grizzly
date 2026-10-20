@@ -24,6 +24,11 @@ final class AppModel {
 
     var engineState: EngineState = .stopped
     var engineInfo: EngineInfo?
+    /// Hardware check and model downloads for the running profile.
+    var setup: SetupStatus?
+    /// The setup screen was opened from Settings, or not yet dismissed.
+    var showSetup = false
+    private var pollingSetup = false
     var engineLog: [String] = []
 
     var projects: [ProjectSummary] = []
@@ -131,12 +136,56 @@ final class AppModel {
 
     private func engineDidStart() async {
         engineInfo = try? await client.info()
+        await refreshSetup()
+        if let setup, !setup.ready { showSetup = true }
         engineState = .running
         await refreshProjects()
         for project in projects where project.busy {
             await resumeTracking(project.id)
         }
         if let selection { await reload(selection) }
+    }
+
+    // MARK: Setup
+
+    func refreshSetup() async {
+        do {
+            setup = try await client.setup()
+            if setup?.downloading == true { pollSetup() }
+        } catch {
+            setup = nil  // an older engine without /api/setup: nothing to set up
+        }
+    }
+
+    /// Downloads the given models, or every required one that's missing.
+    func download(_ ids: [String]? = nil) async {
+        do {
+            setup = try await client.download(DownloadRequest(models: ids))
+            pollSetup()
+        } catch {
+            report(error)
+        }
+    }
+
+    private func pollSetup() {
+        guard !pollingSetup else { return }
+        pollingSetup = true
+        Task {
+            defer { pollingSetup = false }
+            while engineState == .running || engineState == .starting {
+                try? await Task.sleep(for: .seconds(1))
+                guard let next = try? await client.setup() else { break }
+                setup = next
+                if !next.downloading { break }
+            }
+        }
+    }
+
+    /// Restarts the engine on the profile the hardware check suggests.
+    func useRecommendedProfile() async {
+        guard let recommended = setup?.system.recommendedProfile, recommended != profile else { return }
+        profile = recommended
+        await restartEngine()
     }
 
     private func appendLog(_ line: String) {
@@ -155,6 +204,7 @@ final class AppModel {
     }
 
     func select(_ id: String?) {
+        if id != nil { showSetup = false }
         guard id != selection else { return }
         selection = id
         current = nil

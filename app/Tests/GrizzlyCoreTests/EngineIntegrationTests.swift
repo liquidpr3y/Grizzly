@@ -108,6 +108,37 @@ final class EngineIntegrationTests: XCTestCase {
         XCTAssertFalse(remaining.contains { $0.id == project.id })
     }
 
+    func testFirstLaunchSetupDownloadsTheRequiredModels() async throws {
+        var setup = try await client.setup()
+        XCTAssertEqual(setup.profile, "mock")
+        XCTAssertFalse(setup.ready)
+        XCTAssertEqual(setup.required.map(\.id), ["writer", "portraits", "panels"])
+        XCTAssertEqual(setup.optional.map(\.id), ["video"])
+        XCTAssertEqual(Set(setup.system.checks.map(\.id)), ["chip", "macos", "memory", "disk"])
+        XCTAssertGreaterThan(setup.remainingBytes(), 0)
+
+        setup = try await client.download()
+        XCTAssertTrue(setup.downloading)
+        var fractions: Set<Double> = []
+        let deadline = ContinuousClock.now.advanced(by: .seconds(30))
+        while setup.downloading, ContinuousClock.now < deadline {
+            fractions.insert(setup.requiredFraction)
+            try await Task.sleep(for: .milliseconds(50))
+            setup = try await client.setup()
+        }
+        XCTAssertTrue(setup.ready)
+        XCTAssertEqual(setup.requiredFraction, 1)
+        XCTAssertGreaterThan(fractions.count, 2, "progress should move during the download")
+        XCTAssertFalse(try XCTUnwrap(setup.optional.first).complete, "optional models are not fetched unless asked")
+
+        do {
+            _ = try await client.download(DownloadRequest(models: ["nope"]))
+            XCTFail("expected 404")
+        } catch let error as EngineError {
+            XCTAssertEqual(error.status, 404)
+        }
+    }
+
     func testPortConflictFailsFastWithAnExplanation() async throws {
         // `engine` from setUp already holds its port; a second engine on it must fail fast.
         let second = EngineProcess(configuration: .init(

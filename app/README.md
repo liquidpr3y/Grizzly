@@ -27,6 +27,7 @@ Without a built-in engine the app looks in `~/Grizzly/.venv`. If your checkout i
 
 | Area | What it does |
 |---|---|
+| Setup | Shown on launch until the required models are installed. Checks this Mac (Apple silicon, macOS 14+, memory, free disk), suggests a profile for its memory, and downloads the models with live progress. The video model is optional. Reopen it from the engine popover (**Models…**). Models live in the Hugging Face cache, so ones fetched earlier count as installed. |
 | Library (sidebar) | Your stories with cover art; **New Story** (⌘N); right-click to delete. |
 | Graph (default) | The story's pipeline as a node graph in the style of ComfyUI: Premise → Story Bible → Outline → Storyboard, with Cast and Storyboard both feeding Panels, then Clips and Exports. Wires are coloured by data type (text, image, video, file). Nodes show live status and previews. Click a node to open its tab; pinch or use the zoom control to zoom. |
 | Pipeline bar | Shown on the other tabs: Story → Cast → Panels → Export, with live progress such as "Drawing panels · 7 of 16". |
@@ -49,5 +50,5 @@ GrizzlyCore builds and is tested on Linux too: `GRIZZLY_ENGINE_DIR=/path/to/Griz
 
 ## Not done yet
 
-- **Distribution.** The app is self-contained but signed ad hoc, so it runs only on the Mac that built it. Shipping needs a first-launch model download manager, Developer ID signing with the hardened runtime, notarisation, and a licence review of everything bundled (the static ffmpeg is a GPL build).
+- **Distribution.** The app is self-contained but signed ad hoc, so it runs only on the Mac that built it. Shipping needs Developer ID signing with the hardened runtime, notarisation, and a licence review of everything bundled (the static ffmpeg is a GPL build).
 - App icon, a cancel button for running jobs, and editing the outline from the app.

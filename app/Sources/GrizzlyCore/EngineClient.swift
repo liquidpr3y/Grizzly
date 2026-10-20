@@ -40,6 +40,15 @@ public final class EngineClient: @unchecked Sendable {
     public func health() async throws -> Health { try await get("/api/health") }
     public func info() async throws -> EngineInfo { try await get("/api/info") }
 
+    // MARK: First-launch setup
+
+    public func setup() async throws -> SetupStatus { try await get("/api/setup") }
+
+    /// Queues model downloads; fails with status 507 when they won't fit on disk.
+    public func download(_ request: DownloadRequest = DownloadRequest()) async throws -> SetupStatus {
+        try await send("POST", "/api/setup/download", body: request)
+    }
+
     // MARK: Projects
 
     public func projects() async throws -> [ProjectSummary] { try await get("/api/projects") }
