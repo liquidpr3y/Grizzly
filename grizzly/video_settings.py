@@ -54,6 +54,7 @@ class ResolvedVideo:
     height: int
     frames: int
     steps: int
+    negative_prompt: str | None
 
 
 def model_defaults(profile: Profile) -> dict:
@@ -78,4 +79,5 @@ def resolve_video_settings(
     seconds = pick(req.clip_seconds, shot_video.clip_seconds, project_video.clip_seconds)
     frames = frames_for(seconds) if seconds is not None else defaults["frames"]
     steps = pick(req.steps, shot_video.steps, project_video.steps, defaults["steps"])
-    return ResolvedVideo(width, height, frames, steps)
+    negative = project_video.negative_prompt.strip() or None
+    return ResolvedVideo(width, height, frames, steps, negative)

@@ -96,7 +96,7 @@ def test_video_settings_reach_the_video_model_and_the_animatic(store):
     client = TestClient(app)
     pid = client.post("/api/projects", json={"title": "Vid", "premise": "p", "format": "film"}).json()["id"]
     r = client.patch(f"/api/projects/{pid}/settings", json={
-        "video": {"aspect": "9:16", "clip_seconds": 1.0, "steps": 12}, "animatic": {"fps": 30},
+        "video": {"aspect": "9:16", "clip_seconds": 1.0, "steps": 12, "negative_prompt": "blurry, warped hands"}, "animatic": {"fps": 30},
     })
     assert r.status_code == 200 and r.json()["project"]["video"]["aspect"] == "9:16"
     assert client.patch(f"/api/projects/{pid}/settings", json={"video": {"aspect": "5:4"}}).status_code == 422
@@ -108,6 +108,7 @@ def test_video_settings_reach_the_video_model_and_the_animatic(store):
     call = app.state.jobs.pipeline.models.acquire("video").calls[-1]
     w, h = call["size"]
     assert h > w and call["frames"] == 25 and call["steps"] == 4  # request beats project
+    assert call["negative_prompt"] == "blurry, warped hands"
 
     # A shot's own options beat the project's; its motion note joins the prompt.
     r = client.patch(f"/api/projects/{pid}/shots/{shots[0]['id']}", json={

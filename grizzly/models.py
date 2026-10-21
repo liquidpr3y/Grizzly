@@ -148,6 +148,10 @@ class VideoSettings(BaseModel):
     clip_seconds: float | None = Field(default=None, gt=0, le=10)
     steps: int | None = Field(default=None, ge=1, le=100)
     camera: CameraMove = "auto"
+    # Look of the clips; empty uses the story bible's art style.
+    style: str = ""
+    # What the clips should avoid; empty uses the video model's own default.
+    negative_prompt: str = ""
 
 
 class AnimaticSettings(BaseModel):

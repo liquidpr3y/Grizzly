@@ -40,6 +40,18 @@ struct VideoSettingsSheet: View {
                         .foregroundStyle(.secondary)
                 }
 
+                Section {
+                    TextField("Style", text: $video.style, prompt: Text(project.bible?.artStyle ?? "The story's art style"), axis: .vertical)
+                        .lineLimit(2...4)
+                    TextField("Avoid", text: $video.negativePrompt, prompt: Text("The model's default negative prompt"), axis: .vertical)
+                        .lineLimit(2...4)
+                } header: {
+                    Text("Look")
+                } footer: {
+                    Text("Style replaces the story's art style in the motion prompt. Avoid lists what clips should not show, such as \"blurry, warped hands, text\".")
+                        .foregroundStyle(.secondary)
+                }
+
                 Section("Animatic") {
                     Picker("Frame rate", selection: $animatic.fps) {
                         ForEach([24, 25, 30, 60], id: \.self) { Text("\($0) fps").tag($0) }

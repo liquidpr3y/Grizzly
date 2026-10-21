@@ -46,6 +46,8 @@ class MlxWanVideoModel:
             height=height,
             num_frames=frames,
             steps=options.get("steps") or self.steps,
+            # None keeps Wan's own default negative prompt.
+            negative_prompt=options.get("negative_prompt"),
             seed=seed,
             output_path=str(out),
             tiling="auto",

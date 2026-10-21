@@ -116,14 +116,20 @@ public struct VideoSettings: Codable, Hashable, Sendable {
     public var clipSeconds: Double?
     public var steps: Int?
     public var camera: CameraMove = .auto
+    /// Look of the clips; empty uses the story bible's art style.
+    public var style = ""
+    /// What the clips should avoid; empty uses the video model's own default.
+    public var negativePrompt = ""
 
     public init(aspect: VideoAspect = .widescreen, quality: VideoQuality? = nil, clipSeconds: Double? = nil, steps: Int? = nil,
-                camera: CameraMove = .auto) {
+                camera: CameraMove = .auto, style: String = "", negativePrompt: String = "") {
         self.aspect = aspect
         self.quality = quality
         self.clipSeconds = clipSeconds
         self.steps = steps
         self.camera = camera
+        self.style = style
+        self.negativePrompt = negativePrompt
     }
 
     /// The video model renders at 24fps and needs 4n+1 frames, 17...121.

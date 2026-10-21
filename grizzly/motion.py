@@ -72,7 +72,7 @@ def motion_prompt(project: Project, shot: Shot) -> str:
     bible = project.bible
     names = ", ".join(c.name for c in shot_cast(bible, shot))
     parts = [
-        bible.art_style,
+        project.video.style.strip() or bible.art_style,
         shot.action,
         shot.video_options.motion,
         f"{names} move naturally with small, believable gestures and expressions" if names else "ambient motion in the environment",
@@ -117,7 +117,8 @@ def render_videos(
         path = out / f"{shot.id}.mp4"
         try:
             model.generate(
-                prompt, root / shot.image, stable_seed(project, key), v.width, v.height, v.frames, path, steps=v.steps
+                prompt, root / shot.image, stable_seed(project, key), v.width, v.height, v.frames, path,
+                steps=v.steps, negative_prompt=v.negative_prompt,
             )
         except Exception as exc:
             log.error("Clip %s failed: %s", shot.id, exc, exc_info=True)

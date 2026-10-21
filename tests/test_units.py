@@ -182,6 +182,11 @@ def test_wan_backend_passes_the_panel_and_settings_to_mlx_video(monkeypatch, tmp
     kw = calls[0]
     assert kw["model_dir"] == str(model_dir) and kw["image"] == str(tmp_path / "s.png")
     assert (kw["width"], kw["height"], kw["num_frames"], kw["steps"], kw["seed"]) == (832, 480, 49, 30, 5)
+    assert kw["negative_prompt"] is None  # Wan's own default
+    MlxWanVideoModel(str(model_dir), 30).generate(
+        "p", tmp_path / "s.png", 5, 832, 480, 49, tmp_path / "v" / "s.mp4", steps=12, negative_prompt="blur", unknown=1,
+    )
+    assert calls[1]["steps"] == 12 and calls[1]["negative_prompt"] == "blur" and "unknown" not in calls[1]
     # Wan constraints: sizes divisible by 32, frames of the form 4n+1.
     from grizzly.config import load_profile
 
@@ -355,3 +360,6 @@ def test_camera_moves_cover_every_choice_and_shots_beat_the_project():
     shot.video_options.camera = "static"
     prompt = motion_prompt(project, shot)
     assert CAMERA_MOVES["static"] in prompt and CAMERA_MOVES["orbit"] not in prompt
+    assert prompt.startswith("ink")
+    project.video.style = "35mm film grain, warm grade"
+    assert motion_prompt(project, shot).startswith("35mm film grain") and "ink" not in motion_prompt(project, shot)
