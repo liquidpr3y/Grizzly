@@ -277,6 +277,11 @@ final class AppModel {
     }
 
     @discardableResult
+    func updateSettings(_ patch: SettingsPatch) async -> Bool {
+        await edit { [client] id in try await client.patchSettings(id, patch) }
+    }
+
+    @discardableResult
     func updateBible(_ patch: BiblePatch) async -> Bool {
         await edit { [client] id in try await client.patchBible(id, patch) }
     }

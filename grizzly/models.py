@@ -10,6 +10,15 @@ from pydantic import BaseModel, Field, field_validator
 
 Format = Literal["comic", "vn", "film"]
 FRAMINGS = ("wide", "medium", "close-up")
+# Frame shapes for clips, panels in films and visual novels, and the animatic.
+ASPECTS: dict[str, tuple[float, float]] = {"16:9": (16, 9), "9:16": (9, 16), "1:1": (1, 1), "4:3": (4, 3), "2.39:1": (2.39, 1)}
+Aspect = Literal["16:9", "9:16", "1:1", "4:3", "2.39:1"]
+Quality = Literal["draft", "standard"]
+# "auto" picks a gentle move from the shot's framing (grizzly/motion.py).
+CameraMove = Literal[
+    "auto", "static", "push-in", "pull-out", "pan-left", "pan-right", "tilt-up", "tilt-down",
+    "orbit", "tracking", "handheld", "crane-up",
+]
 
 
 def slugify(text: str) -> str:
@@ -91,6 +100,18 @@ class DialogueLine(BaseModel):
     text: str
 
 
+class ShotVideoOptions(BaseModel):
+    """A shot's own clip settings. None means the project's setting."""
+
+    clip_seconds: float | None = Field(default=None, gt=0, le=10)
+    steps: int | None = Field(default=None, ge=1, le=100)
+    camera: CameraMove | None = None
+    # Locked seed: every clip of this shot uses it, even on a reroll.
+    seed: int | None = Field(default=None, ge=0, lt=2**31)
+    # Extra direction for the motion, e.g. "she turns to the window".
+    motion: str = ""
+
+
 class Shot(BaseModel):
     id: str
     scene_id: str
@@ -108,6 +129,9 @@ class Shot(BaseModel):
     # Short animated clip made from `image` by the video step.
     video: str | None = None
     video_take: int = 0
+    # Seed the current clip was made with, so a good take can be reproduced.
+    video_seed: int | None = None
+    video_options: ShotVideoOptions = Field(default_factory=ShotVideoOptions)
 
     @field_validator("framing", mode="before")
     @classmethod
@@ -120,6 +144,43 @@ class Shot(BaseModel):
         return v if v in FRAMINGS else "medium"
 
 
+class VideoSettings(BaseModel):
+    """Project-wide image-to-video options. None means the video model's default."""
+
+    aspect: Aspect = "16:9"
+    quality: Quality | None = None
+    clip_seconds: float | None = Field(default=None, gt=0, le=10)
+    steps: int | None = Field(default=None, ge=1, le=100)
+    # How closely clips follow the prompt (classifier-free guidance). 1 turns
+    # guidance off, which is about twice as fast but follows the prompt less.
+    guidance: float | None = Field(default=None, ge=1, le=15)
+    camera: CameraMove = "auto"
+    # Look of the clips; empty uses the story bible's art style.
+    style: str = ""
+    # What the clips should avoid; empty uses the video model's own default.
+    negative_prompt: str = ""
+
+
+class AnimaticSettings(BaseModel):
+    fps: int = Field(default=24, ge=12, le=60)
+    resolution: Literal["720p", "1080p"] = "720p"
+    # Seconds each shot dissolves into the next; 0 is a hard cut.
+    crossfade: float = Field(default=0.0, ge=0, le=2)
+    # Narration and dialogue as a subtitle track in the film.
+    subtitles: bool = True
+
+
+class VideoOverride(BaseModel):
+    """One run's overrides on top of the project and shot settings."""
+
+    aspect: Aspect | None = None
+    quality: Quality | None = None
+    clip_seconds: float | None = Field(default=None, gt=0, le=10)
+    steps: int | None = Field(default=None, ge=1, le=100)
+    seed: int | None = Field(default=None, ge=0, lt=2**31)
+    guidance: float | None = Field(default=None, ge=1, le=15)
+
+
 class Project(BaseModel):
     id: str
     title: str
@@ -130,6 +191,8 @@ class Project(BaseModel):
     bible: StoryBible | None = None
     outline: Outline | None = None
     shots: list[Shot] = Field(default_factory=list)
+    video: VideoSettings = Field(default_factory=VideoSettings)
+    animatic: AnimaticSettings = Field(default_factory=AnimaticSettings)
 
     def status(self) -> dict[str, bool]:
         return {

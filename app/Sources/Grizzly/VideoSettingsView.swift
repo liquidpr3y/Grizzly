@@ -1,0 +1,150 @@
+#if os(macOS)
+import GrizzlyCore
+import SwiftUI
+
+/// Project-wide video options: how clips are generated and how the animatic is cut.
+struct VideoSettingsSheet: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    var project: Project
+    @State private var video = VideoSettings()
+    @State private var animatic = AnimaticSettings()
+
+    private var busy: Bool { model.isBusy(project.id) }
+    private var changed: Bool { video != project.video || animatic != project.animatic }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Form {
+                Section {
+                    Picker("Aspect ratio", selection: $video.aspect) {
+                        ForEach(VideoAspect.allCases) { Text($0.title).tag($0) }
+                    }
+                    Picker("Quality", selection: $video.quality) {
+                        Text("Model default").tag(VideoQuality?.none)
+                        ForEach(VideoQuality.allCases) { Text($0.title).tag(VideoQuality?.some($0)) }
+                    }
+                    Picker("Camera move", selection: $video.camera) {
+                        ForEach(CameraMove.allCases) { Text($0.title).tag($0) }
+                    }
+                    DefaultableSetting(title: "Set clip length", value: $video.clipSeconds, fallback: 1.7) { seconds in
+                        ClipLengthSlider(seconds: seconds)
+                    }
+                    DefaultableSetting(title: "Set steps", value: $video.steps, fallback: 30) { steps in
+                        Stepper("\(steps.wrappedValue) steps", value: steps, in: 4...60, step: 2)
+                    }
+                    DefaultableSetting(title: "Set prompt guidance", value: $video.guidance, fallback: 5) { guidance in
+                        HStack {
+                            Slider(value: guidance, in: 1...10, step: 0.5)
+                            Text(guidance.wrappedValue <= 1 ? "Off (faster)" : String(format: "%.1f", guidance.wrappedValue))
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                                .frame(width: 90, alignment: .trailing)
+                        }
+                    }
+                } header: {
+                    Text("Clips")
+                } footer: {
+                    Text("Guidance sets how closely clips follow the prompt; the model's default is 5, and 1 turns it off for about twice the speed. Longer clips, more steps and higher quality all take longer and use more memory. Changing the aspect ratio also reshapes panels drawn after the change.")
+                        .foregroundStyle(.secondary)
+                }
+
+                Section {
+                    TextField("Style", text: $video.style, prompt: Text(project.bible?.artStyle ?? "The story's art style"), axis: .vertical)
+                        .lineLimit(2...4)
+                    TextField("Avoid", text: $video.negativePrompt, prompt: Text("The model's default negative prompt"), axis: .vertical)
+                        .lineLimit(2...4)
+                } header: {
+                    Text("Look")
+                } footer: {
+                    Text("Style replaces the story's art style in the motion prompt. Avoid lists what clips should not show, such as \"blurry, warped hands, text\".")
+                        .foregroundStyle(.secondary)
+                }
+
+                Section {
+                    Picker("Resolution", selection: $animatic.resolution) {
+                        ForEach(AnimaticResolution.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    Picker("Frame rate", selection: $animatic.fps) {
+                        ForEach([24, 25, 30, 60], id: \.self) { Text("\($0) fps").tag($0) }
+                    }
+                    HStack {
+                        Text("Transitions")
+                        Slider(value: $animatic.crossfade, in: 0...2, step: 0.25)
+                        Text(animatic.crossfade == 0 ? "Hard cut" : String(format: "%.2fs dissolve", animatic.crossfade))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                            .frame(width: 100, alignment: .trailing)
+                    }
+                    Toggle("Subtitles", isOn: $animatic.subtitles)
+                } header: {
+                    Text("Animatic")
+                } footer: {
+                    Text("Takes effect the next time you build the animatic on the Export tab.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .formStyle(.grouped)
+
+            Divider()
+            HStack {
+                Button("Reset to Defaults") {
+                    video = VideoSettings()
+                    animatic = AnimaticSettings()
+                }
+                Spacer()
+                Button("Cancel", role: .cancel) { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button("Save") {
+                    Task {
+                        if await model.updateSettings(SettingsPatch(video: video, animatic: animatic)) { dismiss() }
+                    }
+                }
+                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderedProminent)
+                .disabled(!changed || busy)
+            }
+            .padding(16)
+        }
+        .frame(width: 520)
+        .onAppear {
+            video = project.video
+            animatic = project.animatic
+        }
+    }
+}
+
+/// A setting that is either inherited (nil) or a chosen value.
+struct DefaultableSetting<Value: Sendable, Content: View>: View {
+    var title: String
+    @Binding var value: Value?
+    var fallback: Value
+    @ViewBuilder var content: (Binding<Value>) -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle(title, isOn: Binding(
+                get: { value != nil },
+                set: { value = $0 ? (value ?? fallback) : nil }
+            ))
+            if value != nil {
+                content(Binding(get: { value ?? fallback }, set: { value = $0 }))
+            }
+        }
+    }
+}
+
+struct ClipLengthSlider: View {
+    @Binding var seconds: Double
+
+    var body: some View {
+        HStack {
+            Slider(value: $seconds, in: 0.7...5, step: 0.1)
+            Text("\(seconds, specifier: "%.1f")s · \(VideoSettings.frames(forSeconds: seconds)) frames")
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(width: 130, alignment: .trailing)
+        }
+    }
+}
+#endif

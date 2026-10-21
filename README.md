@@ -93,6 +93,25 @@ grizzly step <id> animatic
 
 Video is slow on a laptop, so `run` never animates on its own. Pick the shots that matter. `--reroll` gives a shot a new take, and `GRIZZLY_VIDEO_FRAMES` / `GRIZZLY_VIDEO_STEPS` trade length and quality for time.
 
+#### Customising clips
+
+Each project has video settings (`video` in `project.json`, the **Video Settings** sheet in the Mac app, `PATCH /api/projects/<id>/settings`):
+
+| Setting | What it does |
+|---|---|
+| `aspect` | 16:9, 9:16, 1:1, 4:3 or 2.39:1. Clips, film and visual novel panels, and the animatic all follow it. |
+| `quality` | `draft` (480p, about twice as fast) or `standard` (720p). Unset keeps the model's size. |
+| `clip_seconds` | Clip length, snapped to Wan's 4n+1 frames (0.7 to 5 seconds). |
+| `steps` | Denoising steps. |
+| `guidance` | How closely clips follow the prompt. Unset keeps the model's 5.0; 1 turns it off for about twice the speed. |
+| `camera` | `auto` (from framing), `static`, `push-in`, `pull-out`, `pan-left`, `pan-right`, `tilt-up`, `tilt-down`, `orbit`, `tracking`, `handheld`, `crane-up`. |
+| `style` | Replaces the story's art style in the motion prompt. |
+| `negative_prompt` | What clips should avoid. Empty keeps the model's default. |
+
+A shot can override clip length, steps and camera, add a motion note ("she turns to the window") and lock a seed (`video_options`, the **Clip** section of the shot inspector). Every clip records its seed in `video_seed`, so a good take can be locked and re-animated with other settings. A single run can override any of these with `"video": {...}` in the step request. Precedence is run, then shot, then project, then the video model's defaults.
+
+The animatic has its own settings (`animatic`): `fps`, `resolution` (720p or 1080p), `crossfade` (seconds of dissolve between shots, 0 for hard cuts) and `subtitles`.
+
 **Licensing note.** Wan 2.2 was chosen over LTX-2.x for its licence. LTX runs well on Apple Silicon, but the LTX-2 Community License (Attachment A, clause 20) bars use in a product that "directly competes with Licensor's commercial products" (Lightricks sells LTX Studio) without a paid licence, and it charges companies with $10M+ revenue. Get legal advice before shipping any model.
 
 ## Roadmap

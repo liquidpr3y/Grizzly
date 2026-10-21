@@ -8,8 +8,11 @@ from grizzly.config import Profile
 
 class VideoModel(Protocol):
     def generate(
-        self, prompt: str, image: Path, seed: int, width: int, height: int, frames: int, out: Path
-    ) -> Path: ...
+        self, prompt: str, image: Path, seed: int, width: int, height: int, frames: int, out: Path, **options
+    ) -> Path:
+        """`options` are optional tuning knobs (steps, ...). A backend uses the
+        ones it understands and ignores the rest."""
+        ...
 
     def unload(self) -> None: ...
 

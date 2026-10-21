@@ -32,6 +32,179 @@ public enum Framing: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// Frame shape for clips, film and visual novel panels, and the animatic.
+public enum VideoAspect: String, Codable, CaseIterable, Identifiable, Sendable {
+    case widescreen = "16:9"
+    case vertical = "9:16"
+    case square = "1:1"
+    case classic = "4:3"
+    case scope = "2.39:1"
+
+    public var id: String { rawValue }
+
+    /// Width over height.
+    public var ratio: Double {
+        switch self {
+        case .widescreen: 16 / 9
+        case .vertical: 9 / 16
+        case .square: 1
+        case .classic: 4 / 3
+        case .scope: 2.39
+        }
+    }
+
+    public var title: String {
+        switch self {
+        case .widescreen: "16:9 Widescreen"
+        case .vertical: "9:16 Vertical"
+        case .square: "1:1 Square"
+        case .classic: "4:3 Classic"
+        case .scope: "2.39:1 Cinemascope"
+        }
+    }
+}
+
+public enum VideoQuality: String, Codable, CaseIterable, Identifiable, Sendable {
+    case draft, standard
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .draft: "Draft (480p, about 2x faster)"
+        case .standard: "Standard (720p)"
+        }
+    }
+}
+
+/// How the camera moves in a clip. `.auto` picks a gentle move from the framing.
+public enum CameraMove: String, Codable, CaseIterable, Identifiable, Sendable {
+    case auto, `static`
+    case pushIn = "push-in"
+    case pullOut = "pull-out"
+    case panLeft = "pan-left"
+    case panRight = "pan-right"
+    case tiltUp = "tilt-up"
+    case tiltDown = "tilt-down"
+    case orbit, tracking, handheld
+    case craneUp = "crane-up"
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .auto: "Auto (from framing)"
+        case .static: "Static"
+        case .pushIn: "Push in"
+        case .pullOut: "Pull out"
+        case .panLeft: "Pan left"
+        case .panRight: "Pan right"
+        case .tiltUp: "Tilt up"
+        case .tiltDown: "Tilt down"
+        case .orbit: "Orbit"
+        case .tracking: "Tracking"
+        case .handheld: "Handheld"
+        case .craneUp: "Crane up"
+        }
+    }
+}
+
+/// Project-wide image-to-video options. nil means the video model's default.
+public struct VideoSettings: Codable, Hashable, Sendable {
+    public var aspect: VideoAspect = .widescreen
+    public var quality: VideoQuality?
+    public var clipSeconds: Double?
+    public var steps: Int?
+    /// How closely clips follow the prompt. 1 turns guidance off: about twice as fast.
+    public var guidance: Double?
+    public var camera: CameraMove = .auto
+    /// Look of the clips; empty uses the story bible's art style.
+    public var style = ""
+    /// What the clips should avoid; empty uses the video model's own default.
+    public var negativePrompt = ""
+
+    public init(aspect: VideoAspect = .widescreen, quality: VideoQuality? = nil, clipSeconds: Double? = nil, steps: Int? = nil,
+                guidance: Double? = nil, camera: CameraMove = .auto, style: String = "", negativePrompt: String = "") {
+        self.aspect = aspect
+        self.quality = quality
+        self.clipSeconds = clipSeconds
+        self.steps = steps
+        self.guidance = guidance
+        self.camera = camera
+        self.style = style
+        self.negativePrompt = negativePrompt
+    }
+
+    /// The video model renders at 24fps and needs 4n+1 frames, 17...121.
+    /// Mirrors grizzly/video_settings.py `frames_for`.
+    public static func frames(forSeconds seconds: Double) -> Int {
+        let n = Int((seconds * 24 / 4).rounded(.toNearestOrEven))
+        return min(121, max(17, n * 4 + 1))
+    }
+}
+
+public enum AnimaticResolution: String, Codable, CaseIterable, Identifiable, Sendable {
+    case hd = "720p"
+    case fullHD = "1080p"
+
+    public var id: String { rawValue }
+}
+
+public struct AnimaticSettings: Codable, Hashable, Sendable {
+    public var fps = 24
+    public var resolution: AnimaticResolution = .hd
+    /// Seconds each shot dissolves into the next; 0 is a hard cut.
+    public var crossfade = 0.0
+    /// Narration and dialogue as a subtitle track in the film.
+    public var subtitles = true
+
+    public init(fps: Int = 24, resolution: AnimaticResolution = .hd, crossfade: Double = 0, subtitles: Bool = true) {
+        self.fps = fps
+        self.resolution = resolution
+        self.crossfade = crossfade
+        self.subtitles = subtitles
+    }
+}
+
+/// One run's overrides on top of the project and shot video settings.
+public struct VideoOverride: Codable, Hashable, Sendable {
+    public var aspect: VideoAspect?
+    public var quality: VideoQuality?
+    public var clipSeconds: Double?
+    public var steps: Int?
+    public var seed: Int?
+    public var guidance: Double?
+
+    public init(aspect: VideoAspect? = nil, quality: VideoQuality? = nil, clipSeconds: Double? = nil, steps: Int? = nil,
+                seed: Int? = nil, guidance: Double? = nil) {
+        self.aspect = aspect
+        self.quality = quality
+        self.clipSeconds = clipSeconds
+        self.steps = steps
+        self.seed = seed
+        self.guidance = guidance
+    }
+}
+
+/// A shot's own clip settings. nil means the project's setting.
+public struct ShotVideoOptions: Codable, Hashable, Sendable {
+    public var clipSeconds: Double?
+    public var steps: Int?
+    public var camera: CameraMove?
+    /// Locked seed: every clip of this shot uses it, even on a reroll.
+    public var seed: Int?
+    /// Extra direction for the motion, e.g. "she turns to the window".
+    public var motion = ""
+
+    public init(clipSeconds: Double? = nil, steps: Int? = nil, camera: CameraMove? = nil, seed: Int? = nil, motion: String = "") {
+        self.clipSeconds = clipSeconds
+        self.steps = steps
+        self.camera = camera
+        self.seed = seed
+        self.motion = motion
+    }
+}
+
 public struct DialogueLine: Codable, Hashable, Sendable {
     public var speaker: String
     public var text: String
@@ -107,6 +280,9 @@ public struct Shot: Codable, Identifiable, Hashable, Sendable {
     public var seedOffset: Int
     public var video: String?
     public var videoTake: Int
+    /// Seed the current clip was made with.
+    public var videoSeed: Int?
+    public var videoOptions: ShotVideoOptions
 }
 
 public struct Project: Codable, Identifiable, Hashable, Sendable {
@@ -119,6 +295,8 @@ public struct Project: Codable, Identifiable, Hashable, Sendable {
     public var bible: StoryBible?
     public var outline: Outline?
     public var shots: [Shot]
+    public var video: VideoSettings
+    public var animatic: AnimaticSettings
 
     public func shots(inScene id: String) -> [Shot] { shots.filter { $0.sceneId == id } }
 }
@@ -242,13 +420,26 @@ public struct StepRequest: Encodable, Sendable {
     public var characters: Int?
     public var locations = 3
     public var reroll = false
+    /// Video step only: overrides the project and shot video settings for this run.
+    public var video: VideoOverride?
 
-    public init(force: Bool = false, only: [String]? = nil, scenes: Int = 4, shots: Int = 4, reroll: Bool = false) {
+    public init(force: Bool = false, only: [String]? = nil, scenes: Int = 4, shots: Int = 4, reroll: Bool = false, video: VideoOverride? = nil) {
         self.force = force
         self.only = only
         self.scenes = scenes
         self.shots = shots
         self.reroll = reroll
+        self.video = video
+    }
+}
+
+public struct SettingsPatch: Encodable, Sendable {
+    public var video: VideoSettings?
+    public var animatic: AnimaticSettings?
+
+    public init(video: VideoSettings? = nil, animatic: AnimaticSettings? = nil) {
+        self.video = video
+        self.animatic = animatic
     }
 }
 
@@ -286,12 +477,15 @@ public struct ShotPatch: Encodable, Sendable {
     public var narration: String?
     public var dialogue: [DialogueLine]?
     public var duration: Double?
+    public var videoOptions: ShotVideoOptions?
 
-    public init(action: String? = nil, framing: Framing? = nil, narration: String? = nil, dialogue: [DialogueLine]? = nil, duration: Double? = nil) {
+    public init(action: String? = nil, framing: Framing? = nil, narration: String? = nil, dialogue: [DialogueLine]? = nil,
+                duration: Double? = nil, videoOptions: ShotVideoOptions? = nil) {
         self.action = action
         self.framing = framing
         self.narration = narration
         self.dialogue = dialogue
         self.duration = duration
+        self.videoOptions = videoOptions
     }
 }

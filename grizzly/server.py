@@ -23,7 +23,9 @@ from pydantic import BaseModel
 
 from grizzly.config import Profile
 from grizzly import __version__
-from grizzly.models import DialogueLine, Format, Project
+from grizzly.models import (
+    AnimaticSettings, DialogueLine, Format, Project, ShotVideoOptions, VideoOverride, VideoSettings,
+)
 from grizzly.pipeline import STEPS, Pipeline
 from grizzly.store import ProjectStore
 
@@ -46,6 +48,13 @@ class StepRequest(BaseModel):
     characters: int | None = None
     locations: int = 3
     reroll: bool = False
+    # Video step only: overrides the project and shot video settings for this run.
+    video: VideoOverride | None = None
+
+
+class SettingsPatch(BaseModel):
+    video: VideoSettings | None = None
+    animatic: AnimaticSettings | None = None
 
 
 class BiblePatch(BaseModel):
@@ -68,6 +77,7 @@ class ShotPatch(BaseModel):
     narration: str | None = None
     dialogue: list[DialogueLine] | None = None
     duration: float | None = None
+    video_options: ShotVideoOptions | None = None
 
 
 class Jobs:
@@ -105,7 +115,7 @@ class Jobs:
                     out = self.pipeline.run(
                         job["project"], job["step"], force=req.force, only=set(req.only) if req.only else None,
                         n_characters=req.characters, n_locations=req.locations, progress=progress,
-                        reroll=req.reroll, **kw,
+                        reroll=req.reroll, video=req.video, **kw,
                     )
                 if isinstance(out, Path):
                     job["result"] = str(out.relative_to(self.pipeline.store.root(job["project"])))
@@ -221,6 +231,16 @@ def create_app(profile: Profile, store: ProjectStore) -> FastAPI:
         store.save(project)
         return {"project": project, "status": project.status(), "busy": False}
 
+    @app.patch("/api/projects/{pid}/settings")
+    def patch_settings(pid: str, body: SettingsPatch):
+        project = editable(pid)
+        if body.video is not None:
+            project.video = body.video
+        if body.animatic is not None:
+            project.animatic = body.animatic
+        store.save(project)
+        return {"project": project, "status": project.status(), "busy": False}
+
     @app.patch("/api/projects/{pid}/shots/{sid}")
     def patch_shot(pid: str, sid: str, body: ShotPatch):
         project = editable(pid)
@@ -231,6 +251,8 @@ def create_app(profile: Profile, store: ProjectStore) -> FastAPI:
         if "framing" in data:
             # Reuse the model's normalisation ("Close Up" -> "close-up").
             data["framing"] = type(shot)(id="x", scene_id="x", action="x", framing=data["framing"]).framing
+        if body.video_options is not None:
+            data["video_options"] = body.video_options
         for key, value in data.items():
             setattr(shot, key, value)
         store.save(project)

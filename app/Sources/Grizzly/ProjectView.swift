@@ -16,6 +16,7 @@ struct ProjectView: View {
     @Environment(AppModel.self) private var model
     var envelope: ProjectEnvelope
     @State private var tab: ProjectTab = .graph
+    @State private var showVideoSettings = false
 
     private var project: Project { envelope.project }
     private var busy: Bool { model.isBusy(project.id) }
@@ -45,6 +46,9 @@ struct ProjectView: View {
         }
         .background(Theme.canvas)
         .navigationTitle(project.title)
+        .sheet(isPresented: $showVideoSettings) {
+            VideoSettingsSheet(project: project)
+        }
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Picker("View", selection: $tab) {
@@ -52,6 +56,14 @@ struct ProjectView: View {
                 }
                 .pickerStyle(.segmented)
                 .frame(width: 440)
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showVideoSettings = true
+                } label: {
+                    Label("Video Settings", systemImage: "slider.horizontal.3")
+                }
+                .help("Frame shape, clip length, quality and animatic output for this project")
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {

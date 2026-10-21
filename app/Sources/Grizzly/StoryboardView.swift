@@ -123,11 +123,18 @@ struct ShotInspector: View {
     @State private var framing: Framing = .medium
     @State private var narration = ""
     @State private var dialogue: [DialogueLine] = []
+    @State private var videoOptions = ShotVideoOptions()
     @State private var player: AVPlayer?
 
     private var busy: Bool { model.isBusy(project.id) }
     private var changed: Bool {
         action != shot.action || framing != shot.framing || narration != shot.narration || dialogue != shot.dialogue
+            || videoOptions != shot.videoOptions
+    }
+
+    private var animateTitle: String {
+        if shot.video == nil { return "Animate" }
+        return videoOptions.seed == nil ? "New Clip" : "Re-animate"
     }
 
     var body: some View {
@@ -175,6 +182,40 @@ struct ShotInspector: View {
                     }
                 }
 
+                DisclosureGroup("Clip") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        TextField("Extra motion, e.g. she turns to the window", text: $videoOptions.motion, axis: .vertical)
+                            .textFieldStyle(.roundedBorder)
+                        Picker("Camera", selection: $videoOptions.camera) {
+                            Text("Project (\(project.video.camera.title))").tag(CameraMove?.none)
+                            ForEach(CameraMove.allCases) { Text($0.title).tag(CameraMove?.some($0)) }
+                        }
+                        DefaultableSetting(title: "Own clip length", value: $videoOptions.clipSeconds,
+                                           fallback: project.video.clipSeconds ?? 1.7) { seconds in
+                            ClipLengthSlider(seconds: seconds)
+                        }
+                        DefaultableSetting(title: "Own steps", value: $videoOptions.steps, fallback: project.video.steps ?? 30) { steps in
+                            Stepper("\(steps.wrappedValue) steps", value: steps, in: 4...60, step: 2)
+                        }
+                        DefaultableSetting(title: "Lock seed", value: $videoOptions.seed, fallback: shot.videoSeed ?? 0) { seed in
+                            TextField("Seed", value: seed, format: .number.grouping(.never))
+                                .textFieldStyle(.roundedBorder)
+                                .monospacedDigit()
+                        }
+                        if let used = shot.videoSeed {
+                            Text("This clip used seed \(String(used)). Lock it to keep this take's motion while you change other settings.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                        }
+                        Text("Anything left off follows the project's Video Settings.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.top, 8)
+                }
+                .font(.callout)
+
                 Divider()
 
                 VStack(spacing: 8) {
@@ -201,16 +242,17 @@ struct ShotInspector: View {
                         Button {
                             Task {
                                 guard await save() else { return }
-                                model.run(.video, StepRequest(only: [shot.id], reroll: shot.video != nil))
+                                // A locked seed re-animates the same take with the new settings.
+                                model.run(.video, StepRequest(only: [shot.id], reroll: shot.video != nil && videoOptions.seed == nil))
                             }
                         } label: {
-                            Label(shot.video == nil ? "Animate" : "New Clip", systemImage: "film").frame(maxWidth: .infinity)
+                            Label(animateTitle, systemImage: "film").frame(maxWidth: .infinity)
                         }
                         .disabled(shot.image == nil)
                     }
 
                     if changed {
-                        Button("Save Text Only") { Task { await save() } }
+                        Button("Save Without Rendering") { Task { await save() } }
                             .buttonStyle(.link)
                     }
                     Text("A redraw takes about 20 seconds. Animating takes several minutes per clip on this Mac.")
@@ -233,7 +275,7 @@ struct ShotInspector: View {
     private var preview: some View {
         if let player {
             VideoPlayer(player: player)
-                .aspectRatio(16 / 9, contentMode: .fit)
+                .aspectRatio(project.video.aspect.ratio, contentMode: .fit)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         } else {
             AspectImage(url: shot.image.flatMap { model.fileURL($0) }, ratio: 16 / 10)
@@ -256,6 +298,7 @@ struct ShotInspector: View {
         framing = shot.framing
         narration = shot.narration
         dialogue = shot.dialogue
+        videoOptions = shot.videoOptions
         loadPlayer()
     }
 
@@ -276,7 +319,7 @@ struct ShotInspector: View {
         guard changed else { return true }
         return await model.updateShot(
             shot.id,
-            ShotPatch(action: action, framing: framing, narration: narration, dialogue: dialogue)
+            ShotPatch(action: action, framing: framing, narration: narration, dialogue: dialogue, videoOptions: videoOptions)
         )
     }
 }
@@ -345,7 +388,7 @@ struct ExportTab: View {
                 ) {
                     if let animaticPlayer {
                         VideoPlayer(player: animaticPlayer)
-                            .aspectRatio(16 / 9, contentMode: .fit)
+                            .aspectRatio(project.video.aspect.ratio, contentMode: .fit)
                             .frame(maxWidth: 720)
                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }

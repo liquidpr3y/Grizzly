@@ -68,6 +68,10 @@ public final class EngineClient: @unchecked Sendable {
         try await send("PATCH", "/api/projects/\(project)/shots/\(shot)", body: patch)
     }
 
+    public func patchSettings(_ project: String, _ patch: SettingsPatch) async throws -> ProjectEnvelope {
+        try await send("PATCH", "/api/projects/\(project)/settings", body: patch)
+    }
+
     public func exports(_ project: String) async throws -> Exports { try await get("/api/projects/\(project)/exports") }
 
     // MARK: Jobs

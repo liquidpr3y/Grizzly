@@ -12,7 +12,9 @@ class MockVideoModel:
     def __init__(self) -> None:
         self.calls: list[dict] = []
 
-    def generate(self, prompt: str, image: Path, seed: int, width: int, height: int, frames: int, out: Path) -> Path:
+    def generate(
+        self, prompt: str, image: Path, seed: int, width: int, height: int, frames: int, out: Path, **options
+    ) -> Path:
         out.parent.mkdir(parents=True, exist_ok=True)
         vf = (
             f"scale={width * 2}:{height * 2}:force_original_aspect_ratio=increase,crop={width * 2}:{height * 2},"
@@ -23,7 +25,9 @@ class MockVideoModel:
             [ffmpeg(), "-y", "-i", str(image), "-vf", vf, "-frames:v", str(frames), "-c:v", "libx264", str(out)],
             check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
         )
-        self.calls.append({"prompt": prompt, "image": str(image), "seed": seed})
+        self.calls.append(
+            {"prompt": prompt, "image": str(image), "seed": seed, "size": (width, height), "frames": frames, **options}
+        )
         return out
 
     def unload(self) -> None:
