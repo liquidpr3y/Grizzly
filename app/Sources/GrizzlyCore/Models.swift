@@ -154,12 +154,14 @@ public struct VideoOverride: Codable, Hashable, Sendable {
     public var quality: VideoQuality?
     public var clipSeconds: Double?
     public var steps: Int?
+    public var seed: Int?
 
-    public init(aspect: VideoAspect? = nil, quality: VideoQuality? = nil, clipSeconds: Double? = nil, steps: Int? = nil) {
+    public init(aspect: VideoAspect? = nil, quality: VideoQuality? = nil, clipSeconds: Double? = nil, steps: Int? = nil, seed: Int? = nil) {
         self.aspect = aspect
         self.quality = quality
         self.clipSeconds = clipSeconds
         self.steps = steps
+        self.seed = seed
     }
 }
 
@@ -168,13 +170,16 @@ public struct ShotVideoOptions: Codable, Hashable, Sendable {
     public var clipSeconds: Double?
     public var steps: Int?
     public var camera: CameraMove?
+    /// Locked seed: every clip of this shot uses it, even on a reroll.
+    public var seed: Int?
     /// Extra direction for the motion, e.g. "she turns to the window".
     public var motion = ""
 
-    public init(clipSeconds: Double? = nil, steps: Int? = nil, camera: CameraMove? = nil, motion: String = "") {
+    public init(clipSeconds: Double? = nil, steps: Int? = nil, camera: CameraMove? = nil, seed: Int? = nil, motion: String = "") {
         self.clipSeconds = clipSeconds
         self.steps = steps
         self.camera = camera
+        self.seed = seed
         self.motion = motion
     }
 }
@@ -254,6 +259,8 @@ public struct Shot: Codable, Identifiable, Hashable, Sendable {
     public var seedOffset: Int
     public var video: String?
     public var videoTake: Int
+    /// Seed the current clip was made with.
+    public var videoSeed: Int?
     public var videoOptions: ShotVideoOptions
 }
 

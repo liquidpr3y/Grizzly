@@ -132,6 +132,11 @@ struct ShotInspector: View {
             || videoOptions != shot.videoOptions
     }
 
+    private var animateTitle: String {
+        if shot.video == nil { return "Animate" }
+        return videoOptions.seed == nil ? "New Clip" : "Re-animate"
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -192,6 +197,17 @@ struct ShotInspector: View {
                         DefaultableSetting(title: "Own steps", value: $videoOptions.steps, fallback: project.video.steps ?? 30) { steps in
                             Stepper("\(steps.wrappedValue) steps", value: steps, in: 4...60, step: 2)
                         }
+                        DefaultableSetting(title: "Lock seed", value: $videoOptions.seed, fallback: shot.videoSeed ?? 0) { seed in
+                            TextField("Seed", value: seed, format: .number.grouping(.never))
+                                .textFieldStyle(.roundedBorder)
+                                .monospacedDigit()
+                        }
+                        if let used = shot.videoSeed {
+                            Text("This clip used seed \(String(used)). Lock it to keep this take's motion while you change other settings.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                        }
                         Text("Anything left off follows the project's Video Settings.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -226,10 +242,11 @@ struct ShotInspector: View {
                         Button {
                             Task {
                                 guard await save() else { return }
-                                model.run(.video, StepRequest(only: [shot.id], reroll: shot.video != nil))
+                                // A locked seed re-animates the same take with the new settings.
+                                model.run(.video, StepRequest(only: [shot.id], reroll: shot.video != nil && videoOptions.seed == nil))
                             }
                         } label: {
-                            Label(shot.video == nil ? "Animate" : "New Clip", systemImage: "film").frame(maxWidth: .infinity)
+                            Label(animateTitle, systemImage: "film").frame(maxWidth: .infinity)
                         }
                         .disabled(shot.image == nil)
                     }

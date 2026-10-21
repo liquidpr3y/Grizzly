@@ -120,6 +120,23 @@ def test_video_settings_reach_the_video_model_and_the_animatic(store):
     call = app.state.jobs.pipeline.models.acquire("video").calls[-1]
     assert call["frames"] == 49 and call["steps"] == 6 and "the gull takes off" in call["prompt"]
 
+    # The seed used is recorded; a reroll moves to a new one unless the seed is locked.
+    sid = shots[0]["id"]
+
+    def animate(**body):
+        assert wait(client, client.post(f"/api/projects/{pid}/steps/video", json={"only": [sid], **body}).json()["id"])["state"] == "done"
+        shot = client.get(f"/api/projects/{pid}").json()["project"]["shots"][0]
+        assert shot["video_seed"] == app.state.jobs.pipeline.models.acquire("video").calls[-1]["seed"]
+        return shot["video_seed"]
+
+    first = animate()
+    assert animate() == first
+    rerolled = animate(reroll=True)
+    assert rerolled != first
+    client.patch(f"/api/projects/{pid}/shots/{sid}", json={"video_options": {"seed": first}})
+    assert animate(reroll=True) == first
+    assert animate(video={"seed": 42}) == 42
+
     from PIL import Image
 
     root = store.root(pid)

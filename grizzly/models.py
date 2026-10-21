@@ -106,6 +106,8 @@ class ShotVideoOptions(BaseModel):
     clip_seconds: float | None = Field(default=None, gt=0, le=10)
     steps: int | None = Field(default=None, ge=1, le=100)
     camera: CameraMove | None = None
+    # Locked seed: every clip of this shot uses it, even on a reroll.
+    seed: int | None = Field(default=None, ge=0, lt=2**31)
     # Extra direction for the motion, e.g. "she turns to the window".
     motion: str = ""
 
@@ -127,6 +129,8 @@ class Shot(BaseModel):
     # Short animated clip made from `image` by the video step.
     video: str | None = None
     video_take: int = 0
+    # Seed the current clip was made with, so a good take can be reproduced.
+    video_seed: int | None = None
     video_options: ShotVideoOptions = Field(default_factory=ShotVideoOptions)
 
     @field_validator("framing", mode="before")
@@ -165,6 +169,7 @@ class VideoOverride(BaseModel):
     quality: Quality | None = None
     clip_seconds: float | None = Field(default=None, gt=0, le=10)
     steps: int | None = Field(default=None, ge=1, le=100)
+    seed: int | None = Field(default=None, ge=0, lt=2**31)
 
 
 class Project(BaseModel):

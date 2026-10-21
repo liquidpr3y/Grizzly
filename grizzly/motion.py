@@ -108,16 +108,20 @@ def render_videos(
     for i, shot in enumerate(todo):
         if progress:
             progress(i, len(todo), f"clip {shot.id}")
-        if reroll:
+        v = resolve_video_settings(project, shot, overrides, profile)
+        if reroll and v.seed is None:
             shot.video_take += 1
         key = f"{shot.id}:video" if not shot.video_take else f"{shot.id}:video:{shot.video_take}"
+        seed = v.seed if v.seed is not None else stable_seed(project, key)
         prompt = motion_prompt(project, shot)
-        v = resolve_video_settings(project, shot, overrides, profile)
-        log.info("Animating %s (%dx%d, %d frames, %d steps): %s", shot.id, v.width, v.height, v.frames, v.steps, prompt[:160])
+        log.info(
+            "Animating %s (%dx%d, %d frames, %d steps, seed %d): %s",
+            shot.id, v.width, v.height, v.frames, v.steps, seed, prompt[:160],
+        )
         path = out / f"{shot.id}.mp4"
         try:
             model.generate(
-                prompt, root / shot.image, stable_seed(project, key), v.width, v.height, v.frames, path,
+                prompt, root / shot.image, seed, v.width, v.height, v.frames, path,
                 steps=v.steps, negative_prompt=v.negative_prompt,
             )
         except Exception as exc:
@@ -126,6 +130,7 @@ def render_videos(
             shot.video = None
         else:
             shot.video = str(path.relative_to(root))
+            shot.video_seed = seed
             score = clip_motion(path)
             if score < STATIC_THRESHOLD:
                 log.warning("Clip %s barely moves (motion %.3f); try a larger size or --reroll", shot.id, score)
