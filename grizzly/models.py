@@ -10,6 +10,10 @@ from pydantic import BaseModel, Field, field_validator
 
 Format = Literal["comic", "vn", "film"]
 FRAMINGS = ("wide", "medium", "close-up")
+# Frame shapes for clips, panels in films and visual novels, and the animatic.
+ASPECTS: dict[str, tuple[float, float]] = {"16:9": (16, 9), "9:16": (9, 16), "1:1": (1, 1), "4:3": (4, 3), "2.39:1": (2.39, 1)}
+Aspect = Literal["16:9", "9:16", "1:1", "4:3", "2.39:1"]
+Quality = Literal["draft", "standard"]
 
 
 def slugify(text: str) -> str:
@@ -120,6 +124,28 @@ class Shot(BaseModel):
         return v if v in FRAMINGS else "medium"
 
 
+class VideoSettings(BaseModel):
+    """Project-wide image-to-video options. None means the video model's default."""
+
+    aspect: Aspect = "16:9"
+    quality: Quality | None = None
+    clip_seconds: float | None = Field(default=None, gt=0, le=10)
+    steps: int | None = Field(default=None, ge=1, le=100)
+
+
+class AnimaticSettings(BaseModel):
+    fps: int = Field(default=24, ge=12, le=60)
+
+
+class VideoOverride(BaseModel):
+    """One run's overrides on top of the project and shot settings."""
+
+    aspect: Aspect | None = None
+    quality: Quality | None = None
+    clip_seconds: float | None = Field(default=None, gt=0, le=10)
+    steps: int | None = Field(default=None, ge=1, le=100)
+
+
 class Project(BaseModel):
     id: str
     title: str
@@ -130,6 +156,8 @@ class Project(BaseModel):
     bible: StoryBible | None = None
     outline: Outline | None = None
     shots: list[Shot] = Field(default_factory=list)
+    video: VideoSettings = Field(default_factory=VideoSettings)
+    animatic: AnimaticSettings = Field(default_factory=AnimaticSettings)
 
     def status(self) -> dict[str, bool]:
         return {

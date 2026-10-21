@@ -12,7 +12,7 @@ from grizzly.config import Profile
 from grizzly.image import create_image_model, create_ref_model
 from grizzly.llm import create_llm
 from grizzly.memory import ModelManager, peak_memory_gb
-from grizzly.models import Project
+from grizzly.models import Project, VideoOverride
 from grizzly.motion import render_videos
 from grizzly.render.animatic import build_animatic
 from grizzly.render.comic import build_comic
@@ -60,6 +60,7 @@ class Pipeline:
         n_locations: int = 3,
         progress: Progress | None = None,
         reroll: bool = False,
+        video: VideoOverride | None = None,
     ) -> Project | Path:
         project = self.store.load(project_id)
         root = self.store.root(project_id)
@@ -104,7 +105,7 @@ class Pipeline:
             model = self.models.acquire("video")
             render_videos(
                 project, root, model, self.profile, force, only, reroll, progress,
-                on_each=lambda: self.store.save(project),
+                on_each=lambda: self.store.save(project), overrides=video,
             )
             self.store.save(project)
             return project

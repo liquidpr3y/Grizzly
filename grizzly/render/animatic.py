@@ -12,9 +12,18 @@ from pathlib import Path
 
 from grizzly.models import Project, Shot
 from grizzly.tools import ffmpeg, media_duration
+from grizzly.video_settings import aspect_ratio
 
-FPS = 24
-W, H = 1280, 720
+# Short side of the film; the long side follows the project's aspect.
+SHORT_SIDE = 720
+
+
+def frame_size(aspect: str) -> tuple[int, int]:
+    """Output size for `aspect`, with even sides for H.264."""
+    r = aspect_ratio(aspect)
+    if r >= 1:
+        return round(SHORT_SIDE * r / 2) * 2, SHORT_SIDE
+    return SHORT_SIDE, round(SHORT_SIDE / r / 2) * 2
 
 
 def _run(cmd: list[str]) -> None:
@@ -53,12 +62,15 @@ def _voice(lines: list[tuple[str, str]], work: Path, shot_id: str) -> tuple[Path
     return combined, durs
 
 
-def _shot_clip(image: Path, audio: Path | None, duration: float, index: int, out: Path) -> None:
-    frames = max(1, round(duration * FPS))
+def _shot_clip(
+    image: Path, audio: Path | None, duration: float, index: int, out: Path, size: tuple[int, int], fps: int
+) -> None:
+    w, h = size
+    frames = max(1, round(duration * fps))
     zoom = f"1+0.12*on/{frames}" if index % 2 == 0 else f"1.12-0.12*on/{frames}"
     vf = (
-        f"scale={W * 2}:{H * 2}:force_original_aspect_ratio=increase,crop={W * 2}:{H * 2},"
-        f"zoompan=z='{zoom}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={W}x{H}:fps={FPS},"
+        f"scale={w * 2}:{h * 2}:force_original_aspect_ratio=increase,crop={w * 2}:{h * 2},"
+        f"zoompan=z='{zoom}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={w}x{h}:fps={fps},"
         "format=yuv420p"
     )
     audio_in = ["-i", str(audio)] if audio else ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo"]
@@ -66,15 +78,16 @@ def _shot_clip(image: Path, audio: Path | None, duration: float, index: int, out
         ffmpeg(), "-y", "-i", str(image), *audio_in,
         "-filter_complex", f"[0:v]{vf}[v];[1:a]apad,aresample=44100[a]",
         "-map", "[v]", "-map", "[a]", "-t", f"{duration:.3f}",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-r", str(FPS),
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-r", str(fps),
         "-c:a", "aac", "-ar", "44100", "-ac", "2", str(out),
     ])
 
 
-def _video_clip(video: Path, audio: Path | None, duration: float, out: Path) -> None:
+def _video_clip(video: Path, audio: Path | None, duration: float, out: Path, size: tuple[int, int], fps: int) -> None:
     """Use a generated clip; hold its last frame if the voice-over runs longer."""
+    w, h = size
     vf = (
-        f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},fps={FPS},"
+        f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},fps={fps},"
         f"tpad=stop_mode=clone:stop_duration={duration:.3f},format=yuv420p"
     )
     audio_in = ["-i", str(audio)] if audio else ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo"]
@@ -82,7 +95,7 @@ def _video_clip(video: Path, audio: Path | None, duration: float, out: Path) -> 
         ffmpeg(), "-y", "-i", str(video), *audio_in,
         "-filter_complex", f"[0:v]{vf}[v];[1:a]apad,aresample=44100[a]",
         "-map", "[v]", "-map", "[a]", "-t", f"{duration:.3f}",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-r", str(FPS),
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-r", str(fps),
         "-c:a", "aac", "-ar", "44100", "-ac", "2", str(out),
     ])
 
@@ -100,6 +113,7 @@ def build_animatic(project: Project, root: Path) -> Path:
     out = root / "exports" / "animatic"
     work = out / "_work"
     work.mkdir(parents=True, exist_ok=True)
+    size, fps = frame_size(project.video.aspect), project.animatic.fps
     clips, srt, t, n = [], [], 0.0, 1
     for i, shot in enumerate(s for s in project.shots if s.image and (root / s.image).exists()):
         lines = _lines(project, shot)
@@ -107,9 +121,9 @@ def build_animatic(project: Project, root: Path) -> Path:
         duration = max(shot.duration, sum(durs) + 0.5)
         clip = work / f"{shot.id}.mp4"
         if shot.video and (root / shot.video).exists():
-            _video_clip(root / shot.video, audio, duration, clip)
+            _video_clip(root / shot.video, audio, duration, clip, size, fps)
         else:
-            _shot_clip(root / shot.image, audio, duration, i, clip)
+            _shot_clip(root / shot.image, audio, duration, i, clip, size, fps)
         clips.append(clip)
         if lines:
             durs = durs or [duration / len(lines)] * len(lines)

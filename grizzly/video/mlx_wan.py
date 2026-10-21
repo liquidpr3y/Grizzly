@@ -32,7 +32,9 @@ class MlxWanVideoModel:
                 self._model_dir = snapshot_download(self.repo)
         return self._model_dir
 
-    def generate(self, prompt: str, image: Path, seed: int, width: int, height: int, frames: int, out: Path) -> Path:
+    def generate(
+        self, prompt: str, image: Path, seed: int, width: int, height: int, frames: int, out: Path, **options
+    ) -> Path:
         from mlx_video.models.wan_2.generate import generate_video
 
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -43,7 +45,7 @@ class MlxWanVideoModel:
             width=width,
             height=height,
             num_frames=frames,
-            steps=self.steps,
+            steps=options.get("steps") or self.steps,
             seed=seed,
             output_path=str(out),
             tiling="auto",

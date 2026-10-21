@@ -20,6 +20,7 @@ from PIL import Image
 from grizzly.config import Profile
 from grizzly.image import ImageModel
 from grizzly.models import Character, Project, Shot, StoryBible
+from grizzly.video_settings import size_for
 
 log = logging.getLogger(__name__)
 
@@ -65,7 +66,9 @@ def shot_cast(bible: StoryBible, shot: Shot) -> list[Character]:
     return cast
 
 
-def shot_prompt(bible: StoryBible, shot: Shot, film: bool = False, ref_ids: list[str] | None = None) -> str:
+def shot_prompt(
+    bible: StoryBible, shot: Shot, film: bool = False, ref_ids: list[str] | None = None, aspect: str = "16:9"
+) -> str:
     """ref_ids: ids of the characters whose portraits are passed as reference
     images, in order, so the prompt can say which image shows whom."""
     parts = [bible.art_style, FRAMING_PHRASES.get(shot.framing, ""), shot.action]
@@ -98,14 +101,16 @@ def shot_prompt(bible: StoryBible, shot: Shot, film: bool = False, ref_ids: list
     if bible.tone:
         parts.append(f"Mood: {bible.tone}")
     if film:
-        parts.append("cinematic 16:9 composition")
+        parts.append(f"cinematic {aspect} composition")
     parts.append(NO_TEXT)
     return ". ".join(p.strip().rstrip(".") for p in parts if p and p.strip()) + "."
 
 
 def shot_size(profile: Profile, project: Project, shot: Shot) -> tuple[int, int]:
     if project.format in ("film", "vn"):
-        return profile.sizes["film"]
+        # Drawn at the clip's shape, so animating it does not crop the panel.
+        w, h = profile.sizes["film"]
+        return (w, h) if project.video.aspect == "16:9" else size_for(project.video.aspect, w * h, 16)
     return profile.sizes.get(shot.framing, profile.sizes["medium"])
 
 
@@ -190,7 +195,10 @@ def render_shots(
         if reroll:
             shot.seed_offset += 1
         w, h = shot_size(profile, project, shot)
-        prompt = shot_prompt(project.bible, shot, film=project.format != "comic", ref_ids=[cid for cid, _ in refs])
+        prompt = shot_prompt(
+            project.bible, shot, film=project.format != "comic", ref_ids=[cid for cid, _ in refs],
+            aspect=project.video.aspect,
+        )
         log.info("Rendering %s (%dx%d, %d refs): %s", shot.id, w, h, len(refs), prompt[:160])
         key = shot.id if not shot.seed_offset else f"{shot.id}:{shot.seed_offset}"
         try:

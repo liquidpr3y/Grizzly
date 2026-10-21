@@ -85,3 +85,34 @@ def test_jobs_report_their_stage(store):
     # A full run ends on its export step; single steps report their own name.
     assert job["state"] == "done" and job["stage"] == "comic"
     assert wait(client, client.post(f"/api/projects/{pid}/steps/vn").json()["id"])["stage"] == "vn"
+
+
+def test_video_settings_reach_the_video_model_and_the_animatic(store):
+    from grizzly import tools
+
+    if not tools.has_ffmpeg():
+        pytest.skip("ffmpeg not installed")
+    app = create_app(load_profile("mock"), store)
+    client = TestClient(app)
+    pid = client.post("/api/projects", json={"title": "Vid", "premise": "p", "format": "film"}).json()["id"]
+    r = client.patch(f"/api/projects/{pid}/settings", json={
+        "video": {"aspect": "9:16", "clip_seconds": 1.0, "steps": 12}, "animatic": {"fps": 30},
+    })
+    assert r.status_code == 200 and r.json()["project"]["video"]["aspect"] == "9:16"
+    assert client.patch(f"/api/projects/{pid}/settings", json={"video": {"aspect": "5:4"}}).status_code == 422
+    assert wait(client, client.post(f"/api/projects/{pid}/steps/all", json={"scenes": 1, "shots": 2}).json()["id"])["state"] == "done"
+
+    shots = client.get(f"/api/projects/{pid}").json()["project"]["shots"]
+    job = client.post(f"/api/projects/{pid}/steps/video", json={"only": [shots[0]["id"]], "video": {"steps": 4}}).json()
+    assert wait(client, job["id"])["state"] == "done"
+    call = app.state.jobs.pipeline.models.acquire("video").calls[-1]
+    w, h = call["size"]
+    assert h > w and call["frames"] == 25 and call["steps"] == 4  # request beats project
+
+    from PIL import Image
+
+    root = store.root(pid)
+    panel = Image.open(root / shots[0]["image"])
+    assert panel.height > panel.width  # panels are drawn at the clip's shape
+    job = wait(client, client.post(f"/api/projects/{pid}/steps/animatic").json()["id"])
+    assert job["state"] == "done", job["error"]

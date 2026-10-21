@@ -233,7 +233,7 @@ struct ShotInspector: View {
     private var preview: some View {
         if let player {
             VideoPlayer(player: player)
-                .aspectRatio(16 / 9, contentMode: .fit)
+                .aspectRatio(project.video.aspect.ratio, contentMode: .fit)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         } else {
             AspectImage(url: shot.image.flatMap { model.fileURL($0) }, ratio: 16 / 10)
@@ -345,7 +345,7 @@ struct ExportTab: View {
                 ) {
                     if let animaticPlayer {
                         VideoPlayer(player: animaticPlayer)
-                            .aspectRatio(16 / 9, contentMode: .fit)
+                            .aspectRatio(project.video.aspect.ratio, contentMode: .fit)
                             .frame(maxWidth: 720)
                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }

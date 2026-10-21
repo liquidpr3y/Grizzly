@@ -23,7 +23,7 @@ from pydantic import BaseModel
 
 from grizzly.config import Profile
 from grizzly import __version__
-from grizzly.models import DialogueLine, Format, Project
+from grizzly.models import AnimaticSettings, DialogueLine, Format, Project, VideoOverride, VideoSettings
 from grizzly.pipeline import STEPS, Pipeline
 from grizzly.store import ProjectStore
 
@@ -46,6 +46,13 @@ class StepRequest(BaseModel):
     characters: int | None = None
     locations: int = 3
     reroll: bool = False
+    # Video step only: overrides the project and shot video settings for this run.
+    video: VideoOverride | None = None
+
+
+class SettingsPatch(BaseModel):
+    video: VideoSettings | None = None
+    animatic: AnimaticSettings | None = None
 
 
 class BiblePatch(BaseModel):
@@ -105,7 +112,7 @@ class Jobs:
                     out = self.pipeline.run(
                         job["project"], job["step"], force=req.force, only=set(req.only) if req.only else None,
                         n_characters=req.characters, n_locations=req.locations, progress=progress,
-                        reroll=req.reroll, **kw,
+                        reroll=req.reroll, video=req.video, **kw,
                     )
                 if isinstance(out, Path):
                     job["result"] = str(out.relative_to(self.pipeline.store.root(job["project"])))
@@ -218,6 +225,16 @@ def create_app(profile: Profile, store: ProjectStore) -> FastAPI:
             raise HTTPException(404, f"No character {cid!r}")
         for key, value in body.model_dump(exclude_none=True).items():
             setattr(character, key, value)
+        store.save(project)
+        return {"project": project, "status": project.status(), "busy": False}
+
+    @app.patch("/api/projects/{pid}/settings")
+    def patch_settings(pid: str, body: SettingsPatch):
+        project = editable(pid)
+        if body.video is not None:
+            project.video = body.video
+        if body.animatic is not None:
+            project.animatic = body.animatic
         store.save(project)
         return {"project": project, "status": project.status(), "busy": False}
 

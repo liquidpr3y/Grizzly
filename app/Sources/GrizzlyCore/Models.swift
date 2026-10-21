@@ -32,6 +32,96 @@ public enum Framing: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// Frame shape for clips, film and visual novel panels, and the animatic.
+public enum VideoAspect: String, Codable, CaseIterable, Identifiable, Sendable {
+    case widescreen = "16:9"
+    case vertical = "9:16"
+    case square = "1:1"
+    case classic = "4:3"
+    case scope = "2.39:1"
+
+    public var id: String { rawValue }
+
+    /// Width over height.
+    public var ratio: Double {
+        switch self {
+        case .widescreen: 16 / 9
+        case .vertical: 9 / 16
+        case .square: 1
+        case .classic: 4 / 3
+        case .scope: 2.39
+        }
+    }
+
+    public var title: String {
+        switch self {
+        case .widescreen: "16:9 Widescreen"
+        case .vertical: "9:16 Vertical"
+        case .square: "1:1 Square"
+        case .classic: "4:3 Classic"
+        case .scope: "2.39:1 Cinemascope"
+        }
+    }
+}
+
+public enum VideoQuality: String, Codable, CaseIterable, Identifiable, Sendable {
+    case draft, standard
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .draft: "Draft (480p, about 2x faster)"
+        case .standard: "Standard (720p)"
+        }
+    }
+}
+
+/// Project-wide image-to-video options. nil means the video model's default.
+public struct VideoSettings: Codable, Hashable, Sendable {
+    public var aspect: VideoAspect = .widescreen
+    public var quality: VideoQuality?
+    public var clipSeconds: Double?
+    public var steps: Int?
+
+    public init(aspect: VideoAspect = .widescreen, quality: VideoQuality? = nil, clipSeconds: Double? = nil, steps: Int? = nil) {
+        self.aspect = aspect
+        self.quality = quality
+        self.clipSeconds = clipSeconds
+        self.steps = steps
+    }
+
+    /// The video model renders at 24fps and needs 4n+1 frames, 17...121.
+    /// Mirrors grizzly/video_settings.py `frames_for`.
+    public static func frames(forSeconds seconds: Double) -> Int {
+        let n = Int((seconds * 24 / 4).rounded(.toNearestOrEven))
+        return min(121, max(17, n * 4 + 1))
+    }
+}
+
+public struct AnimaticSettings: Codable, Hashable, Sendable {
+    public var fps = 24
+
+    public init(fps: Int = 24) {
+        self.fps = fps
+    }
+}
+
+/// One run's overrides on top of the project and shot video settings.
+public struct VideoOverride: Codable, Hashable, Sendable {
+    public var aspect: VideoAspect?
+    public var quality: VideoQuality?
+    public var clipSeconds: Double?
+    public var steps: Int?
+
+    public init(aspect: VideoAspect? = nil, quality: VideoQuality? = nil, clipSeconds: Double? = nil, steps: Int? = nil) {
+        self.aspect = aspect
+        self.quality = quality
+        self.clipSeconds = clipSeconds
+        self.steps = steps
+    }
+}
+
 public struct DialogueLine: Codable, Hashable, Sendable {
     public var speaker: String
     public var text: String
@@ -119,6 +209,8 @@ public struct Project: Codable, Identifiable, Hashable, Sendable {
     public var bible: StoryBible?
     public var outline: Outline?
     public var shots: [Shot]
+    public var video: VideoSettings
+    public var animatic: AnimaticSettings
 
     public func shots(inScene id: String) -> [Shot] { shots.filter { $0.sceneId == id } }
 }
@@ -242,13 +334,26 @@ public struct StepRequest: Encodable, Sendable {
     public var characters: Int?
     public var locations = 3
     public var reroll = false
+    /// Video step only: overrides the project and shot video settings for this run.
+    public var video: VideoOverride?
 
-    public init(force: Bool = false, only: [String]? = nil, scenes: Int = 4, shots: Int = 4, reroll: Bool = false) {
+    public init(force: Bool = false, only: [String]? = nil, scenes: Int = 4, shots: Int = 4, reroll: Bool = false, video: VideoOverride? = nil) {
         self.force = force
         self.only = only
         self.scenes = scenes
         self.shots = shots
         self.reroll = reroll
+        self.video = video
+    }
+}
+
+public struct SettingsPatch: Encodable, Sendable {
+    public var video: VideoSettings?
+    public var animatic: AnimaticSettings?
+
+    public init(video: VideoSettings? = nil, animatic: AnimaticSettings? = nil) {
+        self.video = video
+        self.animatic = animatic
     }
 }
 

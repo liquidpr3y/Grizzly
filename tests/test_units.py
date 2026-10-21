@@ -270,7 +270,7 @@ def test_ffmpeg_falls_back_to_the_bundled_binary(monkeypatch, tmp_path):
 
     imageio_ffmpeg = pytest.importorskip("imageio_ffmpeg")
     from grizzly import tools
-    from grizzly.render.animatic import W, H, _shot_clip
+    from grizzly.render.animatic import _shot_clip, frame_size
 
     tools.ffmpeg.cache_clear()
     monkeypatch.delenv("GRIZZLY_FFMPEG", raising=False)
@@ -279,8 +279,9 @@ def test_ffmpeg_falls_back_to_the_bundled_binary(monkeypatch, tmp_path):
         assert tools.ffmpeg() == imageio_ffmpeg.get_ffmpeg_exe()
         from PIL import Image
 
-        Image.new("RGB", (W, H), "teal").save(tmp_path / "p.png")
-        _shot_clip(tmp_path / "p.png", None, 1.5, 0, tmp_path / "clip.mp4")
+        size = frame_size("16:9")
+        Image.new("RGB", size, "teal").save(tmp_path / "p.png")
+        _shot_clip(tmp_path / "p.png", None, 1.5, 0, tmp_path / "clip.mp4", size, 24)
         assert abs(tools.media_duration(tmp_path / "clip.mp4") - 1.5) < 0.1
         monkeypatch.setenv("GRIZZLY_FFMPEG", "/opt/custom/ffmpeg")
         tools.ffmpeg.cache_clear()
@@ -298,3 +299,40 @@ def test_media_duration_parses_the_banner(monkeypatch, tmp_path):
     monkeypatch.setattr(tools, "ffmpeg", lambda: "ffmpeg")
     monkeypatch.setattr(subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 1, "", banner))
     assert tools.media_duration(tmp_path / "x.wav") == 62.5
+
+
+def test_video_sizes_follow_aspect_and_quality():
+    from grizzly.render.animatic import frame_size
+    from grizzly.video_settings import frames_for, video_size
+
+    wan = (1280, 704)
+    # No choice made: the model's own size, untouched.
+    assert video_size("16:9", None, wan) == wan
+    assert video_size("16:9", "standard", wan) == wan
+    assert video_size("16:9", "draft", wan) == (832, 480)
+    assert video_size("9:16", None, wan) == (704, 1280)
+    for aspect in ("1:1", "4:3", "2.39:1", "9:16"):
+        for quality in ("draft", "standard"):
+            w, h = video_size(aspect, quality, wan)
+            assert w % 32 == 0 and h % 32 == 0
+    # Clip length snaps to Wan's 4n+1 frame counts, within its range.
+    assert frames_for(1.7) == 41 and frames_for(5) == 121 and frames_for(30) == 121 and frames_for(0.1) == 17
+    assert all((frames_for(s / 10) - 1) % 4 == 0 for s in range(1, 60))
+    assert frame_size("16:9") == (1280, 720) and frame_size("9:16") == (720, 1280)
+
+
+def test_video_settings_resolve_request_over_project_over_model_defaults():
+    from grizzly.config import load_profile
+    from grizzly.models import Project, Shot, VideoOverride
+    from grizzly.video_settings import resolve_video_settings
+
+    profile = load_profile("m5pro-24gb")
+    project = Project(id="p", title="t", premise="p")
+    shot = Shot(id="s1", scene_id="a", action="x")
+    v = resolve_video_settings(project, shot, None, profile)
+    assert (v.width, v.height, v.frames, v.steps) == (1280, 704, profile.video_frames, profile.video_steps)
+    project.video.aspect, project.video.clip_seconds, project.video.steps = "9:16", 3.0, 20
+    v = resolve_video_settings(project, shot, None, profile)
+    assert (v.width, v.height, v.frames, v.steps) == (704, 1280, 73, 20)
+    v = resolve_video_settings(project, shot, VideoOverride(quality="draft", steps=8), profile)
+    assert (v.width, v.height, v.steps) == (480, 832, 8)

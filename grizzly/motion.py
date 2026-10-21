@@ -15,9 +15,10 @@ from typing import Callable
 from PIL import Image, ImageChops, ImageStat
 
 from grizzly.config import Profile
-from grizzly.models import Project, Shot
+from grizzly.models import Project, Shot, VideoOverride
 from grizzly.tools import ffmpeg
 from grizzly.video import VideoModel
+from grizzly.video_settings import resolve_video_settings
 from grizzly.visuals import Progress, shot_cast, stable_seed
 
 log = logging.getLogger(__name__)
@@ -73,6 +74,7 @@ def render_videos(
     reroll: bool = False,
     progress: Progress | None = None,
     on_each: Callable[[], None] | None = None,
+    overrides: VideoOverride | None = None,
 ) -> None:
     out = root / "video"
     todo = [
@@ -82,7 +84,6 @@ def render_videos(
         and (only is None or s.id in only)
         and (force or only is not None or not (s.video and (root / s.video).exists()))
     ]
-    w, h = profile.video_size
     failed: list[tuple[str, Exception]] = []
     for i, shot in enumerate(todo):
         if progress:
@@ -91,10 +92,13 @@ def render_videos(
             shot.video_take += 1
         key = f"{shot.id}:video" if not shot.video_take else f"{shot.id}:video:{shot.video_take}"
         prompt = motion_prompt(project, shot)
-        log.info("Animating %s (%dx%d, %d frames): %s", shot.id, w, h, profile.video_frames, prompt[:160])
+        v = resolve_video_settings(project, shot, overrides, profile)
+        log.info("Animating %s (%dx%d, %d frames, %d steps): %s", shot.id, v.width, v.height, v.frames, v.steps, prompt[:160])
         path = out / f"{shot.id}.mp4"
         try:
-            model.generate(prompt, root / shot.image, stable_seed(project, key), w, h, profile.video_frames, path)
+            model.generate(
+                prompt, root / shot.image, stable_seed(project, key), v.width, v.height, v.frames, path, steps=v.steps
+            )
         except Exception as exc:
             log.error("Clip %s failed: %s", shot.id, exc, exc_info=True)
             failed.append((shot.id, exc))

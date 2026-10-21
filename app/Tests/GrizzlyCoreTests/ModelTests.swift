@@ -25,6 +25,29 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(shot, #"{"framing":"close-up"}"#)
     }
 
+    func testVideoSettingsRoundTripAndFrameCounts() throws {
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        encoder.outputFormatting = .sortedKeys
+        let request = StepRequest(only: ["s1"], video: VideoOverride(quality: .draft, steps: 8))
+        let json = String(decoding: try encoder.encode(request), as: UTF8.self)
+        XCTAssertTrue(json.contains(#""video":{"quality":"draft","steps":8}"#), json)
+        let patch = String(decoding: try encoder.encode(SettingsPatch(video: VideoSettings(aspect: .vertical, clipSeconds: 3))), as: UTF8.self)
+        XCTAssertEqual(patch, #"{"video":{"aspect":"9:16","clip_seconds":3}}"#)
+
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let wire = #"{"aspect":"2.39:1","quality":null,"clip_seconds":2.5,"steps":null}"#
+        let settings = try decoder.decode(VideoSettings.self, from: Data(wire.utf8))
+        XCTAssertEqual(settings, VideoSettings(aspect: .scope, clipSeconds: 2.5))
+
+        // Same as grizzly/video_settings.py frames_for.
+        XCTAssertEqual(VideoSettings.frames(forSeconds: 1.7), 41)
+        XCTAssertEqual(VideoSettings.frames(forSeconds: 3), 73)
+        XCTAssertEqual(VideoSettings.frames(forSeconds: 0.1), 17)
+        XCTAssertEqual(VideoSettings.frames(forSeconds: 30), 121)
+    }
+
     func testFileURLsAreCacheBusted() {
         let client = EngineClient(port: 8642)
         XCTAssertEqual(client.fileURL(project: "p", path: "images/shots/s1_01.png").absoluteString,
