@@ -57,6 +57,7 @@ class ResolvedVideo:
     negative_prompt: str | None
     # Fixed seed from the request or the shot; None = the shot's take seed.
     seed: int | None
+    guidance: float | None
 
 
 def model_defaults(profile: Profile) -> dict:
@@ -83,4 +84,5 @@ def resolve_video_settings(
     steps = pick(req.steps, shot_video.steps, project_video.steps, defaults["steps"])
     negative = project_video.negative_prompt.strip() or None
     seed = pick(req.seed, shot_video.seed)
-    return ResolvedVideo(width, height, frames, steps, negative, seed)
+    guidance = pick(req.guidance, project_video.guidance)
+    return ResolvedVideo(width, height, frames, steps, negative, seed, guidance)

@@ -122,7 +122,7 @@ def render_videos(
         try:
             model.generate(
                 prompt, root / shot.image, seed, v.width, v.height, v.frames, path,
-                steps=v.steps, negative_prompt=v.negative_prompt,
+                steps=v.steps, negative_prompt=v.negative_prompt, guidance=v.guidance,
             )
         except Exception as exc:
             log.error("Clip %s failed: %s", shot.id, exc, exc_info=True)

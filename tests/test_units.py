@@ -182,11 +182,12 @@ def test_wan_backend_passes_the_panel_and_settings_to_mlx_video(monkeypatch, tmp
     kw = calls[0]
     assert kw["model_dir"] == str(model_dir) and kw["image"] == str(tmp_path / "s.png")
     assert (kw["width"], kw["height"], kw["num_frames"], kw["steps"], kw["seed"]) == (832, 480, 49, 30, 5)
-    assert kw["negative_prompt"] is None  # Wan's own default
+    assert kw["negative_prompt"] is None and kw["guide_scale"] is None  # Wan's own defaults
     MlxWanVideoModel(str(model_dir), 30).generate(
-        "p", tmp_path / "s.png", 5, 832, 480, 49, tmp_path / "v" / "s.mp4", steps=12, negative_prompt="blur", unknown=1,
+        "p", tmp_path / "s.png", 5, 832, 480, 49, tmp_path / "v" / "s.mp4", steps=12, negative_prompt="blur", guidance=3.5, unknown=1,
     )
-    assert calls[1]["steps"] == 12 and calls[1]["negative_prompt"] == "blur" and "unknown" not in calls[1]
+    assert calls[1]["steps"] == 12 and calls[1]["negative_prompt"] == "blur" and calls[1]["guide_scale"] == 3.5
+    assert "unknown" not in calls[1]
     # Wan constraints: sizes divisible by 32, frames of the form 4n+1.
     from grizzly.config import load_profile
 
@@ -341,6 +342,10 @@ def test_video_settings_resolve_request_over_project_over_model_defaults():
     assert (v.width, v.height, v.frames, v.steps) == (704, 1280, 73, 20)
     v = resolve_video_settings(project, shot, VideoOverride(quality="draft", steps=8), profile)
     assert (v.width, v.height, v.steps) == (480, 832, 8)
+    assert v.guidance is None
+    project.video.guidance = 4.0
+    assert resolve_video_settings(project, shot, None, profile).guidance == 4.0
+    assert resolve_video_settings(project, shot, VideoOverride(guidance=1.0), profile).guidance == 1.0
 
 
 def test_camera_moves_cover_every_choice_and_shots_beat_the_project():

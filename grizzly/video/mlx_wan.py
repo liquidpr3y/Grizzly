@@ -48,6 +48,9 @@ class MlxWanVideoModel:
             steps=options.get("steps") or self.steps,
             # None keeps Wan's own default negative prompt.
             negative_prompt=options.get("negative_prompt"),
+            # None keeps the model's default (5.0 for TI2V-5B); <= 1 skips the
+            # unconditional pass, roughly halving the time per step.
+            guide_scale=options.get("guidance"),
             seed=seed,
             output_path=str(out),
             tiling="auto",

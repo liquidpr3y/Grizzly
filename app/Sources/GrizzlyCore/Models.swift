@@ -115,6 +115,8 @@ public struct VideoSettings: Codable, Hashable, Sendable {
     public var quality: VideoQuality?
     public var clipSeconds: Double?
     public var steps: Int?
+    /// How closely clips follow the prompt. 1 turns guidance off: about twice as fast.
+    public var guidance: Double?
     public var camera: CameraMove = .auto
     /// Look of the clips; empty uses the story bible's art style.
     public var style = ""
@@ -122,11 +124,12 @@ public struct VideoSettings: Codable, Hashable, Sendable {
     public var negativePrompt = ""
 
     public init(aspect: VideoAspect = .widescreen, quality: VideoQuality? = nil, clipSeconds: Double? = nil, steps: Int? = nil,
-                camera: CameraMove = .auto, style: String = "", negativePrompt: String = "") {
+                guidance: Double? = nil, camera: CameraMove = .auto, style: String = "", negativePrompt: String = "") {
         self.aspect = aspect
         self.quality = quality
         self.clipSeconds = clipSeconds
         self.steps = steps
+        self.guidance = guidance
         self.camera = camera
         self.style = style
         self.negativePrompt = negativePrompt
@@ -155,13 +158,16 @@ public struct VideoOverride: Codable, Hashable, Sendable {
     public var clipSeconds: Double?
     public var steps: Int?
     public var seed: Int?
+    public var guidance: Double?
 
-    public init(aspect: VideoAspect? = nil, quality: VideoQuality? = nil, clipSeconds: Double? = nil, steps: Int? = nil, seed: Int? = nil) {
+    public init(aspect: VideoAspect? = nil, quality: VideoQuality? = nil, clipSeconds: Double? = nil, steps: Int? = nil,
+                seed: Int? = nil, guidance: Double? = nil) {
         self.aspect = aspect
         self.quality = quality
         self.clipSeconds = clipSeconds
         self.steps = steps
         self.seed = seed
+        self.guidance = guidance
     }
 }
 

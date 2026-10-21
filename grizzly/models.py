@@ -151,6 +151,9 @@ class VideoSettings(BaseModel):
     quality: Quality | None = None
     clip_seconds: float | None = Field(default=None, gt=0, le=10)
     steps: int | None = Field(default=None, ge=1, le=100)
+    # How closely clips follow the prompt (classifier-free guidance). 1 turns
+    # guidance off, which is about twice as fast but follows the prompt less.
+    guidance: float | None = Field(default=None, ge=1, le=15)
     camera: CameraMove = "auto"
     # Look of the clips; empty uses the story bible's art style.
     style: str = ""
@@ -170,6 +173,7 @@ class VideoOverride(BaseModel):
     clip_seconds: float | None = Field(default=None, gt=0, le=10)
     steps: int | None = Field(default=None, ge=1, le=100)
     seed: int | None = Field(default=None, ge=0, lt=2**31)
+    guidance: float | None = Field(default=None, ge=1, le=15)
 
 
 class Project(BaseModel):

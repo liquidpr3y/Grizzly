@@ -33,10 +33,19 @@ struct VideoSettingsSheet: View {
                     DefaultableSetting(title: "Set steps", value: $video.steps, fallback: 30) { steps in
                         Stepper("\(steps.wrappedValue) steps", value: steps, in: 4...60, step: 2)
                     }
+                    DefaultableSetting(title: "Set prompt guidance", value: $video.guidance, fallback: 5) { guidance in
+                        HStack {
+                            Slider(value: guidance, in: 1...10, step: 0.5)
+                            Text(guidance.wrappedValue <= 1 ? "Off (faster)" : String(format: "%.1f", guidance.wrappedValue))
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                                .frame(width: 90, alignment: .trailing)
+                        }
+                    }
                 } header: {
                     Text("Clips")
                 } footer: {
-                    Text("Longer clips, more steps and higher quality all take longer and use more memory. Changing the aspect ratio also reshapes panels drawn after the change.")
+                    Text("Guidance sets how closely clips follow the prompt; the model's default is 5, and 1 turns it off for about twice the speed. Longer clips, more steps and higher quality all take longer and use more memory. Changing the aspect ratio also reshapes panels drawn after the change.")
                         .foregroundStyle(.secondary)
                 }
 
