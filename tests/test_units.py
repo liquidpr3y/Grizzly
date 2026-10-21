@@ -336,3 +336,22 @@ def test_video_settings_resolve_request_over_project_over_model_defaults():
     assert (v.width, v.height, v.frames, v.steps) == (704, 1280, 73, 20)
     v = resolve_video_settings(project, shot, VideoOverride(quality="draft", steps=8), profile)
     assert (v.width, v.height, v.steps) == (480, 832, 8)
+
+
+def test_camera_moves_cover_every_choice_and_shots_beat_the_project():
+    from typing import get_args
+
+    from grizzly.models import CameraMove, Character, Project, Shot, StoryBible
+    from grizzly.motion import CAMERA, CAMERA_MOVES, motion_prompt
+
+    assert set(get_args(CameraMove)) == set(CAMERA_MOVES) | {"auto"}
+    bible = StoryBible(title="t", logline="l", art_style="ink", characters=[
+        Character(id="mara", name="Mara", appearance="red coat")], locations=[])
+    project = Project(id="p", title="t", premise="p", bible=bible)
+    shot = Shot(id="s1", scene_id="a", action="Mara waits", framing="wide", character_ids=["mara"])
+    assert CAMERA["wide"] in motion_prompt(project, shot)
+    project.video.camera = "orbit"
+    assert CAMERA_MOVES["orbit"] in motion_prompt(project, shot)
+    shot.video_options.camera = "static"
+    prompt = motion_prompt(project, shot)
+    assert CAMERA_MOVES["static"] in prompt and CAMERA_MOVES["orbit"] not in prompt

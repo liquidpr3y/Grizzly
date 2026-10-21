@@ -77,18 +77,53 @@ public enum VideoQuality: String, Codable, CaseIterable, Identifiable, Sendable 
     }
 }
 
+/// How the camera moves in a clip. `.auto` picks a gentle move from the framing.
+public enum CameraMove: String, Codable, CaseIterable, Identifiable, Sendable {
+    case auto, `static`
+    case pushIn = "push-in"
+    case pullOut = "pull-out"
+    case panLeft = "pan-left"
+    case panRight = "pan-right"
+    case tiltUp = "tilt-up"
+    case tiltDown = "tilt-down"
+    case orbit, tracking, handheld
+    case craneUp = "crane-up"
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .auto: "Auto (from framing)"
+        case .static: "Static"
+        case .pushIn: "Push in"
+        case .pullOut: "Pull out"
+        case .panLeft: "Pan left"
+        case .panRight: "Pan right"
+        case .tiltUp: "Tilt up"
+        case .tiltDown: "Tilt down"
+        case .orbit: "Orbit"
+        case .tracking: "Tracking"
+        case .handheld: "Handheld"
+        case .craneUp: "Crane up"
+        }
+    }
+}
+
 /// Project-wide image-to-video options. nil means the video model's default.
 public struct VideoSettings: Codable, Hashable, Sendable {
     public var aspect: VideoAspect = .widescreen
     public var quality: VideoQuality?
     public var clipSeconds: Double?
     public var steps: Int?
+    public var camera: CameraMove = .auto
 
-    public init(aspect: VideoAspect = .widescreen, quality: VideoQuality? = nil, clipSeconds: Double? = nil, steps: Int? = nil) {
+    public init(aspect: VideoAspect = .widescreen, quality: VideoQuality? = nil, clipSeconds: Double? = nil, steps: Int? = nil,
+                camera: CameraMove = .auto) {
         self.aspect = aspect
         self.quality = quality
         self.clipSeconds = clipSeconds
         self.steps = steps
+        self.camera = camera
     }
 
     /// The video model renders at 24fps and needs 4n+1 frames, 17...121.
@@ -126,12 +161,14 @@ public struct VideoOverride: Codable, Hashable, Sendable {
 public struct ShotVideoOptions: Codable, Hashable, Sendable {
     public var clipSeconds: Double?
     public var steps: Int?
+    public var camera: CameraMove?
     /// Extra direction for the motion, e.g. "she turns to the window".
     public var motion = ""
 
-    public init(clipSeconds: Double? = nil, steps: Int? = nil, motion: String = "") {
+    public init(clipSeconds: Double? = nil, steps: Int? = nil, camera: CameraMove? = nil, motion: String = "") {
         self.clipSeconds = clipSeconds
         self.steps = steps
+        self.camera = camera
         self.motion = motion
     }
 }

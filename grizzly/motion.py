@@ -28,6 +28,25 @@ CAMERA = {
     "medium": "gentle camera push-in",
     "close-up": "very slight camera push-in, shallow depth of field",
 }
+# Chosen moves, by models.CameraMove; "auto" uses CAMERA by framing.
+CAMERA_MOVES = {
+    "static": "locked-off static camera, no camera movement",
+    "push-in": "slow camera push-in toward the subject",
+    "pull-out": "slow camera pull-out revealing the surroundings",
+    "pan-left": "smooth camera pan to the left",
+    "pan-right": "smooth camera pan to the right",
+    "tilt-up": "camera tilts slowly upward",
+    "tilt-down": "camera tilts slowly downward",
+    "orbit": "camera slowly orbits around the subject",
+    "tracking": "camera tracks alongside the subject as they move",
+    "handheld": "subtle handheld camera sway, documentary feel",
+    "crane-up": "camera cranes up, rising above the scene",
+}
+
+
+def camera_phrase(project: Project, shot: Shot) -> str:
+    move = shot.video_options.camera or project.video.camera
+    return CAMERA_MOVES.get(move) or CAMERA.get(shot.framing, CAMERA["medium"])
 
 
 # Mean absolute pixel change between first and last frame, as a fraction of
@@ -57,7 +76,7 @@ def motion_prompt(project: Project, shot: Shot) -> str:
         shot.action,
         shot.video_options.motion,
         f"{names} move naturally with small, believable gestures and expressions" if names else "ambient motion in the environment",
-        CAMERA.get(shot.framing, CAMERA["medium"]),
+        camera_phrase(project, shot),
         "one continuous shot, consistent characters and lighting, smooth motion",
     ]
     if bible.tone:

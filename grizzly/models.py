@@ -14,6 +14,11 @@ FRAMINGS = ("wide", "medium", "close-up")
 ASPECTS: dict[str, tuple[float, float]] = {"16:9": (16, 9), "9:16": (9, 16), "1:1": (1, 1), "4:3": (4, 3), "2.39:1": (2.39, 1)}
 Aspect = Literal["16:9", "9:16", "1:1", "4:3", "2.39:1"]
 Quality = Literal["draft", "standard"]
+# "auto" picks a gentle move from the shot's framing (grizzly/motion.py).
+CameraMove = Literal[
+    "auto", "static", "push-in", "pull-out", "pan-left", "pan-right", "tilt-up", "tilt-down",
+    "orbit", "tracking", "handheld", "crane-up",
+]
 
 
 def slugify(text: str) -> str:
@@ -100,6 +105,7 @@ class ShotVideoOptions(BaseModel):
 
     clip_seconds: float | None = Field(default=None, gt=0, le=10)
     steps: int | None = Field(default=None, ge=1, le=100)
+    camera: CameraMove | None = None
     # Extra direction for the motion, e.g. "she turns to the window".
     motion: str = ""
 
@@ -141,6 +147,7 @@ class VideoSettings(BaseModel):
     quality: Quality | None = None
     clip_seconds: float | None = Field(default=None, gt=0, le=10)
     steps: int | None = Field(default=None, ge=1, le=100)
+    camera: CameraMove = "auto"
 
 
 class AnimaticSettings(BaseModel):

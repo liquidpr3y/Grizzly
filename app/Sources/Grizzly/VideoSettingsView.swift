@@ -24,6 +24,9 @@ struct VideoSettingsSheet: View {
                         Text("Model default").tag(VideoQuality?.none)
                         ForEach(VideoQuality.allCases) { Text($0.title).tag(VideoQuality?.some($0)) }
                     }
+                    Picker("Camera move", selection: $video.camera) {
+                        ForEach(CameraMove.allCases) { Text($0.title).tag($0) }
+                    }
                     DefaultableSetting(title: "Set clip length", value: $video.clipSeconds, fallback: 1.7) { seconds in
                         ClipLengthSlider(seconds: seconds)
                     }

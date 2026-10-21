@@ -181,6 +181,10 @@ struct ShotInspector: View {
                     VStack(alignment: .leading, spacing: 10) {
                         TextField("Extra motion, e.g. she turns to the window", text: $videoOptions.motion, axis: .vertical)
                             .textFieldStyle(.roundedBorder)
+                        Picker("Camera", selection: $videoOptions.camera) {
+                            Text("Project (\(project.video.camera.title))").tag(CameraMove?.none)
+                            ForEach(CameraMove.allCases) { Text($0.title).tag(CameraMove?.some($0)) }
+                        }
                         DefaultableSetting(title: "Own clip length", value: $videoOptions.clipSeconds,
                                            fallback: project.video.clipSeconds ?? 1.7) { seconds in
                             ClipLengthSlider(seconds: seconds)
