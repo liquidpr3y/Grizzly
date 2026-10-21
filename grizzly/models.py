@@ -95,6 +95,15 @@ class DialogueLine(BaseModel):
     text: str
 
 
+class ShotVideoOptions(BaseModel):
+    """A shot's own clip settings. None means the project's setting."""
+
+    clip_seconds: float | None = Field(default=None, gt=0, le=10)
+    steps: int | None = Field(default=None, ge=1, le=100)
+    # Extra direction for the motion, e.g. "she turns to the window".
+    motion: str = ""
+
+
 class Shot(BaseModel):
     id: str
     scene_id: str
@@ -112,6 +121,7 @@ class Shot(BaseModel):
     # Short animated clip made from `image` by the video step.
     video: str | None = None
     video_take: int = 0
+    video_options: ShotVideoOptions = Field(default_factory=ShotVideoOptions)
 
     @field_validator("framing", mode="before")
     @classmethod

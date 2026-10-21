@@ -122,6 +122,20 @@ public struct VideoOverride: Codable, Hashable, Sendable {
     }
 }
 
+/// A shot's own clip settings. nil means the project's setting.
+public struct ShotVideoOptions: Codable, Hashable, Sendable {
+    public var clipSeconds: Double?
+    public var steps: Int?
+    /// Extra direction for the motion, e.g. "she turns to the window".
+    public var motion = ""
+
+    public init(clipSeconds: Double? = nil, steps: Int? = nil, motion: String = "") {
+        self.clipSeconds = clipSeconds
+        self.steps = steps
+        self.motion = motion
+    }
+}
+
 public struct DialogueLine: Codable, Hashable, Sendable {
     public var speaker: String
     public var text: String
@@ -197,6 +211,7 @@ public struct Shot: Codable, Identifiable, Hashable, Sendable {
     public var seedOffset: Int
     public var video: String?
     public var videoTake: Int
+    public var videoOptions: ShotVideoOptions
 }
 
 public struct Project: Codable, Identifiable, Hashable, Sendable {
@@ -391,12 +406,15 @@ public struct ShotPatch: Encodable, Sendable {
     public var narration: String?
     public var dialogue: [DialogueLine]?
     public var duration: Double?
+    public var videoOptions: ShotVideoOptions?
 
-    public init(action: String? = nil, framing: Framing? = nil, narration: String? = nil, dialogue: [DialogueLine]? = nil, duration: Double? = nil) {
+    public init(action: String? = nil, framing: Framing? = nil, narration: String? = nil, dialogue: [DialogueLine]? = nil,
+                duration: Double? = nil, videoOptions: ShotVideoOptions? = nil) {
         self.action = action
         self.framing = framing
         self.narration = narration
         self.dialogue = dialogue
         self.duration = duration
+        self.videoOptions = videoOptions
     }
 }

@@ -74,7 +74,8 @@ def resolve_video_settings(
     aspect = pick(req.aspect, project_video.aspect)
     quality = pick(req.quality, project_video.quality)
     width, height = video_size(aspect, quality, tuple(defaults["size"]))
-    seconds = pick(req.clip_seconds, project_video.clip_seconds)
+    shot_video = shot.video_options
+    seconds = pick(req.clip_seconds, shot_video.clip_seconds, project_video.clip_seconds)
     frames = frames_for(seconds) if seconds is not None else defaults["frames"]
-    steps = pick(req.steps, project_video.steps, defaults["steps"])
+    steps = pick(req.steps, shot_video.steps, project_video.steps, defaults["steps"])
     return ResolvedVideo(width, height, frames, steps)

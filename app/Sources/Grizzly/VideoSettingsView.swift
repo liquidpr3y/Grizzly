@@ -24,16 +24,10 @@ struct VideoSettingsSheet: View {
                         Text("Model default").tag(VideoQuality?.none)
                         ForEach(VideoQuality.allCases) { Text($0.title).tag(VideoQuality?.some($0)) }
                     }
-                    defaultable("Clip length", value: $video.clipSeconds, fallback: 1.7) { seconds in
-                        HStack {
-                            Slider(value: seconds, in: 0.7...5, step: 0.1)
-                            Text("\(seconds.wrappedValue, specifier: "%.1f")s · \(VideoSettings.frames(forSeconds: seconds.wrappedValue)) frames")
-                                .monospacedDigit()
-                                .foregroundStyle(.secondary)
-                                .frame(width: 130, alignment: .trailing)
-                        }
+                    DefaultableSetting(title: "Set clip length", value: $video.clipSeconds, fallback: 1.7) { seconds in
+                        ClipLengthSlider(seconds: seconds)
                     }
-                    defaultable("Steps", value: $video.steps, fallback: 30) { steps in
+                    DefaultableSetting(title: "Set steps", value: $video.steps, fallback: 30) { steps in
                         Stepper("\(steps.wrappedValue) steps", value: steps, in: 4...60, step: 2)
                     }
                 } header: {
@@ -77,19 +71,38 @@ struct VideoSettingsSheet: View {
             animatic = project.animatic
         }
     }
+}
 
-    /// A setting that is either the model's default (nil) or a chosen value.
-    @ViewBuilder
-    private func defaultable<Value: Sendable, Content: View>(
-        _ title: String, value: Binding<Value?>, fallback: Value,
-        @ViewBuilder content: (Binding<Value>) -> Content
-    ) -> some View {
-        Toggle(title, isOn: Binding(
-            get: { value.wrappedValue != nil },
-            set: { value.wrappedValue = $0 ? fallback : nil }
-        ))
-        if value.wrappedValue != nil {
-            content(Binding(get: { value.wrappedValue ?? fallback }, set: { value.wrappedValue = $0 }))
+/// A setting that is either inherited (nil) or a chosen value.
+struct DefaultableSetting<Value: Sendable, Content: View>: View {
+    var title: String
+    @Binding var value: Value?
+    var fallback: Value
+    @ViewBuilder var content: (Binding<Value>) -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle(title, isOn: Binding(
+                get: { value != nil },
+                set: { value = $0 ? (value ?? fallback) : nil }
+            ))
+            if value != nil {
+                content(Binding(get: { value ?? fallback }, set: { value = $0 }))
+            }
+        }
+    }
+}
+
+struct ClipLengthSlider: View {
+    @Binding var seconds: Double
+
+    var body: some View {
+        HStack {
+            Slider(value: $seconds, in: 0.7...5, step: 0.1)
+            Text("\(seconds, specifier: "%.1f")s · \(VideoSettings.frames(forSeconds: seconds)) frames")
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(width: 130, alignment: .trailing)
         }
     }
 }

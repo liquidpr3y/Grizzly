@@ -109,6 +109,16 @@ def test_video_settings_reach_the_video_model_and_the_animatic(store):
     w, h = call["size"]
     assert h > w and call["frames"] == 25 and call["steps"] == 4  # request beats project
 
+    # A shot's own options beat the project's; its motion note joins the prompt.
+    r = client.patch(f"/api/projects/{pid}/shots/{shots[0]['id']}", json={
+        "video_options": {"clip_seconds": 2.0, "steps": 6, "motion": "the gull takes off"},
+    })
+    assert r.json()["project"]["shots"][0]["video_options"]["steps"] == 6
+    job = client.post(f"/api/projects/{pid}/steps/video", json={"only": [shots[0]["id"]]}).json()
+    assert wait(client, job["id"])["state"] == "done"
+    call = app.state.jobs.pipeline.models.acquire("video").calls[-1]
+    assert call["frames"] == 49 and call["steps"] == 6 and "the gull takes off" in call["prompt"]
+
     from PIL import Image
 
     root = store.root(pid)

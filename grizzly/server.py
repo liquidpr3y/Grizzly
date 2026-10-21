@@ -23,7 +23,9 @@ from pydantic import BaseModel
 
 from grizzly.config import Profile
 from grizzly import __version__
-from grizzly.models import AnimaticSettings, DialogueLine, Format, Project, VideoOverride, VideoSettings
+from grizzly.models import (
+    AnimaticSettings, DialogueLine, Format, Project, ShotVideoOptions, VideoOverride, VideoSettings,
+)
 from grizzly.pipeline import STEPS, Pipeline
 from grizzly.store import ProjectStore
 
@@ -75,6 +77,7 @@ class ShotPatch(BaseModel):
     narration: str | None = None
     dialogue: list[DialogueLine] | None = None
     duration: float | None = None
+    video_options: ShotVideoOptions | None = None
 
 
 class Jobs:
@@ -248,6 +251,8 @@ def create_app(profile: Profile, store: ProjectStore) -> FastAPI:
         if "framing" in data:
             # Reuse the model's normalisation ("Close Up" -> "close-up").
             data["framing"] = type(shot)(id="x", scene_id="x", action="x", framing=data["framing"]).framing
+        if body.video_options is not None:
+            data["video_options"] = body.video_options
         for key, value in data.items():
             setattr(shot, key, value)
         store.save(project)

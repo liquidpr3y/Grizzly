@@ -55,6 +55,7 @@ def motion_prompt(project: Project, shot: Shot) -> str:
     parts = [
         bible.art_style,
         shot.action,
+        shot.video_options.motion,
         f"{names} move naturally with small, believable gestures and expressions" if names else "ambient motion in the environment",
         CAMERA.get(shot.framing, CAMERA["medium"]),
         "one continuous shot, consistent characters and lighting, smooth motion",

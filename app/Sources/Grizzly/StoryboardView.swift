@@ -123,11 +123,13 @@ struct ShotInspector: View {
     @State private var framing: Framing = .medium
     @State private var narration = ""
     @State private var dialogue: [DialogueLine] = []
+    @State private var videoOptions = ShotVideoOptions()
     @State private var player: AVPlayer?
 
     private var busy: Bool { model.isBusy(project.id) }
     private var changed: Bool {
         action != shot.action || framing != shot.framing || narration != shot.narration || dialogue != shot.dialogue
+            || videoOptions != shot.videoOptions
     }
 
     var body: some View {
@@ -175,6 +177,25 @@ struct ShotInspector: View {
                     }
                 }
 
+                DisclosureGroup("Clip") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        TextField("Extra motion, e.g. she turns to the window", text: $videoOptions.motion, axis: .vertical)
+                            .textFieldStyle(.roundedBorder)
+                        DefaultableSetting(title: "Own clip length", value: $videoOptions.clipSeconds,
+                                           fallback: project.video.clipSeconds ?? 1.7) { seconds in
+                            ClipLengthSlider(seconds: seconds)
+                        }
+                        DefaultableSetting(title: "Own steps", value: $videoOptions.steps, fallback: project.video.steps ?? 30) { steps in
+                            Stepper("\(steps.wrappedValue) steps", value: steps, in: 4...60, step: 2)
+                        }
+                        Text("Anything left off follows the project's Video Settings.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.top, 8)
+                }
+                .font(.callout)
+
                 Divider()
 
                 VStack(spacing: 8) {
@@ -210,7 +231,7 @@ struct ShotInspector: View {
                     }
 
                     if changed {
-                        Button("Save Text Only") { Task { await save() } }
+                        Button("Save Without Rendering") { Task { await save() } }
                             .buttonStyle(.link)
                     }
                     Text("A redraw takes about 20 seconds. Animating takes several minutes per clip on this Mac.")
@@ -256,6 +277,7 @@ struct ShotInspector: View {
         framing = shot.framing
         narration = shot.narration
         dialogue = shot.dialogue
+        videoOptions = shot.videoOptions
         loadPlayer()
     }
 
@@ -276,7 +298,7 @@ struct ShotInspector: View {
         guard changed else { return true }
         return await model.updateShot(
             shot.id,
-            ShotPatch(action: action, framing: framing, narration: narration, dialogue: dialogue)
+            ShotPatch(action: action, framing: framing, narration: narration, dialogue: dialogue, videoOptions: videoOptions)
         )
     }
 }
