@@ -43,6 +43,9 @@ final class ModelTests: XCTestCase {
         let settings = try decoder.decode(VideoSettings.self, from: Data(wire.utf8))
         XCTAssertEqual(settings, VideoSettings(aspect: .scope, clipSeconds: 2.5, camera: .pushIn, negativePrompt: "blur"))
 
+        let animatic = try decoder.decode(AnimaticSettings.self, from: Data(#"{"fps":30,"resolution":"1080p","crossfade":0.5,"subtitles":false}"#.utf8))
+        XCTAssertEqual(animatic, AnimaticSettings(fps: 30, resolution: .fullHD, crossfade: 0.5, subtitles: false))
+
         // Same as grizzly/video_settings.py frames_for.
         XCTAssertEqual(VideoSettings.frames(forSeconds: 1.7), 41)
         XCTAssertEqual(VideoSettings.frames(forSeconds: 3), 73)

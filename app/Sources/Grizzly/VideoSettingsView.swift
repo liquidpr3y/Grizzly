@@ -61,10 +61,27 @@ struct VideoSettingsSheet: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Section("Animatic") {
+                Section {
+                    Picker("Resolution", selection: $animatic.resolution) {
+                        ForEach(AnimaticResolution.allCases) { Text($0.rawValue).tag($0) }
+                    }
                     Picker("Frame rate", selection: $animatic.fps) {
                         ForEach([24, 25, 30, 60], id: \.self) { Text("\($0) fps").tag($0) }
                     }
+                    HStack {
+                        Text("Transitions")
+                        Slider(value: $animatic.crossfade, in: 0...2, step: 0.25)
+                        Text(animatic.crossfade == 0 ? "Hard cut" : String(format: "%.2fs dissolve", animatic.crossfade))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                            .frame(width: 100, alignment: .trailing)
+                    }
+                    Toggle("Subtitles", isOn: $animatic.subtitles)
+                } header: {
+                    Text("Animatic")
+                } footer: {
+                    Text("Takes effect the next time you build the animatic on the Export tab.")
+                        .foregroundStyle(.secondary)
                 }
             }
             .formStyle(.grouped)

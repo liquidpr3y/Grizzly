@@ -143,11 +143,26 @@ public struct VideoSettings: Codable, Hashable, Sendable {
     }
 }
 
+public enum AnimaticResolution: String, Codable, CaseIterable, Identifiable, Sendable {
+    case hd = "720p"
+    case fullHD = "1080p"
+
+    public var id: String { rawValue }
+}
+
 public struct AnimaticSettings: Codable, Hashable, Sendable {
     public var fps = 24
+    public var resolution: AnimaticResolution = .hd
+    /// Seconds each shot dissolves into the next; 0 is a hard cut.
+    public var crossfade = 0.0
+    /// Narration and dialogue as a subtitle track in the film.
+    public var subtitles = true
 
-    public init(fps: Int = 24) {
+    public init(fps: Int = 24, resolution: AnimaticResolution = .hd, crossfade: Double = 0, subtitles: Bool = true) {
         self.fps = fps
+        self.resolution = resolution
+        self.crossfade = crossfade
+        self.subtitles = subtitles
     }
 }
 

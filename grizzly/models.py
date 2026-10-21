@@ -163,6 +163,11 @@ class VideoSettings(BaseModel):
 
 class AnimaticSettings(BaseModel):
     fps: int = Field(default=24, ge=12, le=60)
+    resolution: Literal["720p", "1080p"] = "720p"
+    # Seconds each shot dissolves into the next; 0 is a hard cut.
+    crossfade: float = Field(default=0.0, ge=0, le=2)
+    # Narration and dialogue as a subtitle track in the film.
+    subtitles: bool = True
 
 
 class VideoOverride(BaseModel):

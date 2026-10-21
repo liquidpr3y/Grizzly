@@ -94,6 +94,21 @@ final class EngineIntegrationTests: XCTestCase {
         let jobs = try await client.jobs(project: project.id)
         XCTAssertEqual(jobs.map(\.id), [job.id, take.id])
 
+        // Video settings: project-wide, per shot and per run, then a clip with its seed recorded.
+        let settings = VideoSettings(aspect: .vertical, clipSeconds: 1, camera: .orbit, negativePrompt: "blur")
+        let configured = try await client.patchSettings(project.id, SettingsPatch(video: settings, animatic: AnimaticSettings(crossfade: 0.25)))
+        XCTAssertEqual(configured.project.video, settings)
+        XCTAssertEqual(configured.project.animatic.crossfade, 0.25)
+        let options = ShotVideoOptions(camera: .static, seed: 7, motion: "the gull takes off")
+        let withOptions = try await client.patchShot(project.id, shot.id, ShotPatch(videoOptions: options))
+        XCTAssertEqual(withOptions.project.shots[0].videoOptions, options)
+        let clip = try await client.run(.video, project: project.id, StepRequest(only: [shot.id], video: VideoOverride(steps: 4)))
+        let clipDone = try await client.waitForJob(clip.id, every: .milliseconds(200))
+        XCTAssertEqual(clipDone.state, .done, clipDone.error ?? "")
+        let animated = try await client.project(project.id).project.shots[0]
+        XCTAssertNotNil(animated.video)
+        XCTAssertEqual(animated.videoSeed, 7)
+
         // Errors carry the engine's message.
         do {
             _ = try await client.patchShot(project.id, "nope", ShotPatch(action: "x"))

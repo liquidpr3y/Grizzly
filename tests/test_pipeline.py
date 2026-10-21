@@ -195,3 +195,22 @@ def test_video_step_animates_shots_and_animatic_uses_the_clips(store, pipeline):
     dur = tools.media_duration(mp4)
     # The 13-frame clip is held on its last frame for the shot's full duration.
     assert dur >= sum(s.duration for s in shots) - 0.5
+
+
+@pytest.mark.skipif(not tools.has_ffmpeg(), reason="ffmpeg not installed")
+def test_animatic_follows_its_output_settings(store, pipeline):
+    project = store.create("Dissolve", "premise", "film")
+    pipeline.run_all(project.id, n_scenes=1, n_shots=3)
+    project = store.load(project.id)
+    total = sum(s.duration for s in project.shots)
+    project.video.aspect = "1:1"
+    project.animatic.resolution = "1080p"
+    project.animatic.fps = 30
+    project.animatic.crossfade = 0.5
+    project.animatic.subtitles = False
+    store.save(project)
+    mp4 = pipeline.run(project.id, "animatic")
+    # Two dissolves of 0.5s overlap the three shots.
+    assert abs(tools.media_duration(mp4) - (total - 1.0)) < 0.3
+    banner = subprocess.run([tools.ffmpeg(), "-i", str(mp4)], capture_output=True, text=True).stderr
+    assert "1080x1080" in banner and "30 fps" in banner and "Subtitle" not in banner

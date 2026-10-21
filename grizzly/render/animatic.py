@@ -14,16 +14,16 @@ from grizzly.models import Project, Shot
 from grizzly.tools import ffmpeg, media_duration
 from grizzly.video_settings import aspect_ratio
 
-# Short side of the film; the long side follows the project's aspect.
-SHORT_SIDE = 720
+# Short side of the film per resolution; the long side follows the aspect.
+SHORT_SIDE = {"720p": 720, "1080p": 1080}
 
 
-def frame_size(aspect: str) -> tuple[int, int]:
+def frame_size(aspect: str, resolution: str = "720p") -> tuple[int, int]:
     """Output size for `aspect`, with even sides for H.264."""
-    r = aspect_ratio(aspect)
+    r, short = aspect_ratio(aspect), SHORT_SIDE[resolution]
     if r >= 1:
-        return round(SHORT_SIDE * r / 2) * 2, SHORT_SIDE
-    return SHORT_SIDE, round(SHORT_SIDE / r / 2) * 2
+        return round(short * r / 2) * 2, short
+    return short, round(short / r / 2) * 2
 
 
 def _run(cmd: list[str]) -> None:
@@ -100,6 +100,24 @@ def _video_clip(video: Path, audio: Path | None, duration: float, out: Path, siz
     ])
 
 
+def _crossfade(clips: list[Path], lengths: list[float], fade: float, fps: int, out: Path) -> None:
+    """Join clips, dissolving picture and sound over `fade` seconds at each cut."""
+    inputs = sum((["-i", str(c)] for c in clips), [])
+    chain = [f"[{i}:v]settb=AVTB,fps={fps},format=yuv420p[v{i}];" for i in range(len(clips))]
+    v, a, offset = "v0", "0:a", 0.0
+    for i in range(1, len(clips)):
+        offset += lengths[i - 1] - fade
+        chain.append(f"[{v}][v{i}]xfade=transition=fade:duration={fade:.3f}:offset={offset:.3f}[x{i}];")
+        chain.append(f"[{a}][{i}:a]acrossfade=d={fade:.3f}[y{i}];")
+        v, a = f"x{i}", f"y{i}"
+    _run([
+        ffmpeg(), "-y", *inputs, "-filter_complex", "".join(chain).rstrip(";"),
+        "-map", f"[{v}]", "-map", f"[{a}]",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-r", str(fps),
+        "-c:a", "aac", "-ar", "44100", "-ac", "2", str(out),
+    ])
+
+
 def _ts(t: float) -> str:
     ms = int(round(t * 1000))
     h, ms = divmod(ms, 3_600_000)
@@ -113,9 +131,13 @@ def build_animatic(project: Project, root: Path) -> Path:
     out = root / "exports" / "animatic"
     work = out / "_work"
     work.mkdir(parents=True, exist_ok=True)
-    size, fps = frame_size(project.video.aspect), project.animatic.fps
-    clips, srt, t, n = [], [], 0.0, 1
-    for i, shot in enumerate(s for s in project.shots if s.image and (root / s.image).exists()):
+    settings = project.animatic
+    size, fps = frame_size(project.video.aspect, settings.resolution), settings.fps
+    shots = [s for s in project.shots if s.image and (root / s.image).exists()]
+    # A dissolve overlaps two shots, so keep it well inside the shortest one.
+    fade = min([settings.crossfade] + [0.4 * s.duration for s in shots]) if len(shots) > 1 else 0.0
+    clips, lengths, srt, t, n = [], [], [], 0.0, 1
+    for i, shot in enumerate(shots):
         lines = _lines(project, shot)
         audio, durs = _voice(lines, work, shot.id)
         duration = max(shot.duration, sum(durs) + 0.5)
@@ -125,6 +147,7 @@ def build_animatic(project: Project, root: Path) -> Path:
         else:
             _shot_clip(root / shot.image, audio, duration, i, clip, size, fps)
         clips.append(clip)
+        lengths.append(duration)
         if lines:
             durs = durs or [duration / len(lines)] * len(lines)
             start = t
@@ -132,17 +155,20 @@ def build_animatic(project: Project, root: Path) -> Path:
                 srt.append(f"{n}\n{_ts(start)} --> {_ts(start + d)}\n{text}\n")
                 start += d
                 n += 1
-        t += duration
+        t += duration - fade
     if not clips:
         raise RuntimeError("No rendered shots to assemble. Run the render step first.")
-    concat = work / "clips.txt"
-    concat.write_text("".join(f"file '{c.name}'\n" for c in clips))
     joined = work / "joined.mp4"
-    _run([ffmpeg(), "-y", "-f", "concat", "-safe", "0", "-i", str(concat), "-c", "copy", str(joined)])
+    if fade > 0:
+        _crossfade(clips, lengths, fade, fps, joined)
+    else:
+        concat = work / "clips.txt"
+        concat.write_text("".join(f"file '{c.name}'\n" for c in clips))
+        _run([ffmpeg(), "-y", "-f", "concat", "-safe", "0", "-i", str(concat), "-c", "copy", str(joined)])
     final = out / f"{project.id}.mp4"
     subs = out / f"{project.id}.srt"
     subs.write_text("\n".join(srt))
-    if not srt:
+    if not srt or not settings.subtitles:
         shutil.copy(joined, final)
         return final
     _run([
