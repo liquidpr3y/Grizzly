@@ -1,113 +1,100 @@
-# WalkSim
+# WalkSim: Event Horizon
 
-First-person walking simulator in **Godot 4.3+** (Forward+, ACES Filmic tonemapping, volumetric fog).
-Project path (Mac): `/Users/waynequarmby/Godot/WalkSim`
+First-person walking simulator in **Godot 4.7.2** (Forward+, Metal on Apple M5 Pro). A hub lounge plus ten cosmic-horror worlds.
+Project (Mac): `~/Godot/WalkSim`. Detailed hand-off from the Grok bot: `WalkSim_Project_Notes.md` (keep it next to this file and read it before touching code).
 
-Workflow: creative direction and architecture come from Gemini chats. Implementation is done by a Grok bot with
-access to the local environment, plus Claude Code with the Godot MCP (`npx @coding-solo/godot-mcp`).
-This file is the shared brief. Keep the "Work so far" section current.
+Sources: design brief from Gemini chats; implementation by a Grok bot working in its own sandbox (`/workspace/ws2`);
+Claude Code with the Godot MCP (`npx @coding-solo/godot-mcp`) can now work on the Mac.
 
-## Vision
+> **Which copy is current?** The Mac `~/Godot/WalkSim` is the 21 Nov 16:13 "hubdeco" build (Art Deco Lounge, baked lighting, Astral Train, Oil Rig).
+> The Grok sandbox `/workspace/ws2` has later **unbaked, undeployed** "Round B" changes (CC0 models, wider viewport, offline black-hole textures).
+> Those exist only on Grok's side, so get them from the user (zip) or redo them on the Mac.
 
-- Tone: **tactile, lived-in architecture suspended in hostile voids**, cold teal / rain / concrete against warm amber / brass.
-  Influences: BioShock, Prey (2017), Guillermo del Toro, Blade Runner 2049, Black Mirror, Neuromancer, Cyberpunk 2077,
-  Nightmare Alley, The Shape of Water, Interstellar, Mind Flayer scale from Stranger Things.
-- **Architectural storytelling**: every space had a clear, mundane purpose before things went wrong; micro-stories in props
-  (half-eaten meals, logbooks, mugs, open suitcases). Lighting does most of the work.
-- **Cosmic horror, not monsters**: something otherworldly in the distance that never affects the player and can never be
-  reached. Scale, silence and indifference. Never over-explained.
-- No combat. Walk, look, interact (E).
+## Vision and rules
 
-## Structure
+- Tone: tactile, lived-in architecture suspended in hostile voids; warm amber/brass against cold teal/rain/concrete.
+  Influences: BioShock, Prey (2017), del Toro, Blade Runner 2049, Black Mirror, Neuromancer, Interstellar, Mind Flayer scale.
+- No combat or puzzles: walk, look, listen, interact (E). Architectural storytelling and micro-stories in props.
+- **Cosmic horror is unreachable**: seen only at a distance through glass, water, fog or void; never approaches, never explained.
+- **Procedural atmosphere in all 11 levels**: events use jittered Poisson-style intervals, never an obvious fixed timer.
+- **No rooms change behind the player.** Layouts are generated once per visit; re-roll only on re-entry or Pause > Regenerate.
+- **Each level is a finite snapshot of about 10 minutes or less**, dense, never an endless generator.
+- Keep it modular so new levels drop in. "Keep everything as the brief has described."
+- The user wants **much higher visual fidelity** and wants to **spend less usage**: prefer free CC0 models/textures (Poly Haven, ambientCG, Kenney, Quaternius; check licences) over modelling from scratch. Code for systems, real assets for art. Lighting and post do most of the work.
 
-A central hub plus 10 biomes, designed so more can be added indefinitely.
+## The eleven places
 
-### Hub: The Event Horizon Lounge (own biome)
-- Grand dim 1920s Art Deco lounge + 1970s analog listening post: mahogany, velvet, brass, reel-to-reel tape banks, in a
-  riveted iron-and-glass conservatory dome.
-- View: a colossal slowly churning golden-amber **Gargantua-style black hole** accretion disk fills the dome. Dust motes
-  drift very slowly.
-- Mechanic: copper coils siphon the black hole's energy into a central **analog cartridge console**. Slot a brass
-  tape cartridge, the hub lighting shifts to that biome's palette, and the bulkhead door unseals to that world.
-- Adding a biome = add a `BiomeDefinition` `.tres`; the hub scans `res://biomes/` (and mounted `.pck`s) and spawns a
-  cartridge on the rack automatically. Godot can export modular `.pck` add-on packs.
+Hub: **Event Horizon Lounge** (static). A dim 1920s Art Deco lounge and 1970s analog listening post in an iron-and-glass dome; a colossal golden-amber accretion disk (Gargantua) fills the view. Copper coils feed an analog cartridge console; slotting a brass cartridge shifts the lounge tint and unseals the bulkhead.
 
-### The 10 biomes (each has a locked "distant presence" outside)
-1. **Post-Human Porcelain Museum** (#30). Everyday 21st-century relics on pedestals, featureless porcelain mannequins. Outside: impossible fractal void, inverted gravity, ambiguous depth. Modular/procedural loops.
-2. **Astral Sleeper Train** (#29). 1920s dining, 1970s sleeper, 1980s neon bar, ending at a glass observation dome. Outside: miles-long ribbon of dark geometric rings parallel to the train; in nebula light they part to reveal something coiled inside. Procedural carriage chain.
-3. **Frozen Luxury Cruise Ship** (#20). Art Deco liner tilted 15 degrees in pack ice. Outside: three impossibly tall black obelisks pulsing pale-green aurora outward. Hybrid.
-4. **Fog-Bound North Sea Oil Rig** (#16). Fog wall, foghorn every 90s, warm mess hall with half-drunk mugs. Outside: massive pale-obsidian form gliding beneath the rig, groaning the legs. Hybrid.
-5. **Orbital Botanical Ring** (#12). Zero-g greenhouse, overgrown hydroponics, floating water sphere. Outside: amber light web spreading across the planet below. Modular/procedural.
-6. **Sunken Victorian Conservatory** (#3). Cracked wrought-iron dome holding back the abyssal ocean, bioluminescent willow. Outside: slow constellation of pale violet lights, flank of something mountain-sized. Static hero room.
-7. **Midnight Desert Motel & Laundromat** (#26). Neon VACANCY, rain-slick asphalt, three unlocked rooms as frozen vignettes. Outside: red upside-down mist, matte-black inverted pyramid hovering. Static.
-8. **Abyssal Hydrothermal Outpost** (Ocean #1). Pressure-sphere research station, black smoker outside the viewport. Outside: tectonic-scale shape drifting past the floodlight edge. Hybrid.
-9. **Gas Giant Aerostat Lounge** (Space #6). Art Deco promenade under a buoyancy envelope, ochre clouds, violet storms. Outside: city-sized translucent jellyfish-like entity in the storm. Static.
-10. **Pulsar Relay Observatory**. Brutalist telemetry bunker on an asteroid, catwalk to a glass pod. A telescope points *away* from the pulsar. Every 20s the beam sweeps and for 2s reveals a miles-wide silhouette in the dark void. Static.
+| Brief no. | Place | Type | Cosmic hook |
+|---|---|---|---|
+| 01 | Post-Human Porcelain Museum | modular | Endless pale fog-void; impossibly tall featureless porcelain silhouettes drift past |
+| 02 | Astral Sleeper Train | modular | Ribbon of dark geometric rings parallel to the train; something coiled behind them |
+| 03 | Frozen Luxury Cruise Ship | hybrid | Three huge black obelisks on the ice; pale-green aurora pulses outward from them |
+| 04 | Fog-Bound North Sea Oil Rig | hybrid | Pale-obsidian mass wider than the rig glides beneath the swells; legs groan |
+| 05 | Orbital Botanical Ring | modular | Geometric amber light web slowly spreading across the planet's night side |
+| 06 | Sunken Victorian Conservatory | static | Violet light constellation reveals a mountain-sized flank |
+| 07 | Midnight Desert Motel & Laundromat | static | Red mist; matte-black inverted pyramid hovering, edged by red lightning |
+| 08 | Abyssal Hydrothermal Outpost | hybrid | Tectonic-scale movement past the floodlights; sonar pings something colossal |
+| 09 | Gas Giant Aerostat Lounge | static | City-sized translucent jellyfish in the storm; flights DELAYED INDEFINITELY |
+| 10 | Pulsar Relay Observatory | static | 20s beam sweep; for 2s reveals a miles-wide silhouette in the void |
 
-Palettes, per-biome layouts, soundscapes and storytelling hooks were specified in the Gemini chat. The full detail lives
-in the source PDF/chat; ask for it if a biome is being built.
+**Numbering trap:** current folders were re-sorted: `01_astral_train` = brief 02, `02_north_sea_oil_rig` = brief 04,
+`03_porcelain_museum` = brief 01, `04_frozen_cruise_ship` = brief 03; 05-10 match. Restore brief numbering and hooks when building new worlds.
+Unbuilt worlds exist only as sealed `BiomeDefinition` `.tres` files (no level scene).
 
-## Technical architecture
+## Architecture (current)
+
+Main scene `res://biomes/hub_event_horizon/EventHorizonLounge.tscn`. Autoloads: `Sfx`, `HUD`, `SceneManager`. Viewport 1600x900.
 
 ```
-res://
-  core/
-    player/PlayerController.tscn   # CharacterBody3D, smooth headbob, raycast interact (E), crosshair dot, speed 3.0
-    resources/BiomeDefinition.gd   # custom Resource
-    systems/SceneManager.gd        # autoload: async load, 1.5s fade-to-black, Hub <-> Biome
-    systems/CosmicDirector.gd      # base class for procedural exterior behaviour
-  biomes/
-    hub_event_horizon/  EventHorizonLounge.tscn, GargantuaBackdrop.tscn, CartridgeConsole.gd
-    01_astral_train/    astral_train.tres, AstralTrainGenerator.tscn, AstralCosmicDirector.gd,
-                        modules/ Car_1920s_Dining, Car_1970s_Sleeper, Car_1980s_NeonBar, Vestibule_Connector, Car_ObservationDome
+core/player/       PlayerController (CharacterBody3D, 3 m/s, Shift 5, head bob, E raycast)
+core/resources/    BiomeDefinition.gd (id, display_name, cartridge_label, description, hub_ambient_tint #d98a36,
+                   hub_light_energy 1.2, level_scene_path (empty = sealed), ambient_preview_audio, sort_order)
+core/systems/      SceneManager (autoload: scans res://biomes/ and mounted .pck, async load, 1.5s fades, safe mode),
+                   CosmicDirector (base class, Poisson events), Sfx, Build
+core/ui/HUD.gd     crosshair, prompts, fade, pause menu (Resume / Return to Lounge / Regenerate / Quit)
+core/shaders/      Metal-safe shaders;  core/textures/ CC0 Poly Haven sets + generated marble/brass/grime
+biomes/hub_event_horizon/, 01_astral_train/, 02_north_sea_oil_rig/, 03..10_*/ (sealed)
+addons/lightmap_baker/   editor plugin driving LightmapGI bake from the command line
+tools/  Bake.tscn, bake.gd, Autotest.gd, aabb.gd
+assets/polyhaven/  18 CC0 glTF models (Grok sandbox only; not yet used in the Lounge)
 ```
 
-`BiomeDefinition` (Resource): `id: StringName`, `display_name`, `cartridge_label`, `hub_ambient_tint: Color = #d98a36`,
-`hub_light_energy: float = 1.2`, `level_scene_path` (`*.tscn`), `ambient_preview_audio: AudioStream`.
-Also needs a locked-cosmic-asset reference (e.g. `MotelInvertedPyramid.tscn`).
+There is no registry: adding a biome = drop a `BiomeDefinition` `.tres` under `res://biomes/`; the rack spawns its cartridge.
+**Do not rename** node names or groups that scripts look up (full list in the notes, section 3.5): e.g. `AnalogConsole/CartridgeSlot`,
+`CartridgeRack/SlotOrigin`, `BulkheadDoor`, `BulkheadThreshold`, `LightmapGI`, `GargantuaBackdrop`; groups `practical`, `reel`, `coil`, `car_light`, `optional`.
 
-**Rule: identity is locked, behaviour is procedural.** What the exterior phenomenon *is* never changes per biome.
-`CosmicDirector` varies *how and when* it appears: weighted random windows (e.g. 45-110s, no fixed timer), randomised
-heading/depth/speed/intensity, audio pitch shifts, and optional gaze-aware triggers (fires when the player looks away
-or turns back to a window).
+Astral Train: generator builds once per visit from a seed: start vestibule (rear bulkhead returns to hub), **5-8 carriages** from three era pools
+(1920s Dining, 1970s Sleeper, 1980s NeonBar; never the same era twice in a row) joined by sliding-door vestibules, always ending in `Car_ObservationDome`.
+Ring ribbon at x=+120m; nebula pocket every 35-80s (`#3a7d8c` / `#6e2c5e`); rings part 4-6s revealing a silhouette at ~x=900m; interior bus ducks -20 dB.
 
-Build approach: hybrid. Static hand-crafted hero rooms plus modular/procedural connectors. Cosmic horror is
-procedural everywhere.
+## Hard-won technical constraints
 
-### Hub spec
-Octagonal/circular lounge, radius 14m, height 12m. Zones: Observation Rim, Siphon Dais (centre), Bulkhead Alcove (rear).
-Nodes: `EventHorizonLounge/` Architecture (StaticBody3D), Props_ArtDeco, SiphonDais (CopperCoils emissive pulse synced to hum, CartridgeRack, AnalogConsole Area3D), BulkheadDoor, Audio_HubAmbience (sub-bass hum, faint vinyl crackle).
-Palette: accretion/key light `#FF9E3D` (DirectionalLight3D through dome ribs), practical lamps `#FFD27D`, mahogany `#2B1810`,
-brass `#8C6D3F` (metallic 0.85, rough 0.35), velvet teal `#14363A`, exterior void `#040508`. Dust motes GPUParticles3D `time_scale 0.25`.
-Gargantua backdrop: unlit black sphere r=400m at z=-800m, two intersecting emissive torus meshes (disk + lensed halo),
-scrolling noise + Fresnel shader `#FF9E3D` to `#FFF3D6`, no raymarching.
+- **Metal timeouts** ("rendering driver timed out", godot#119436, #115893): MSAA off, FXAA on; SSAO/SSR/SDFGI off; shader loops <=4, no `while`; clamp `pow`/divides;
+  sky radiance 32px and static; modest volumetric fog volume (the Lounge disables it). Any GPU frame >1s kills the driver.
+- **Gargantua must not be a live raymarcher.** Planned big version = prebaked texture on a quad. Current = black sphere + torus meshes with `gargantua_ring.gdshader`.
+- **Hub flicker was caused by** realtime directional shadows re-fitting while walking, volumetric fog reprojection, a `TIME`-driven sky, and a scripted lamp flicker.
+  Fixed with baked `LightmapGI` (lamps `BAKE_STATIC`, `UPDATE_ONCE` reflection probes, no realtime directional shadows, additive light-shaft meshes). Keep static spaces baked.
+- `LightmapGI` must be a direct child of the scene root. Bake: `godot -e --path . -- --bake-lighting` (Mac: `Bake Hub Lighting.command`).
+- `godot --path . res://tools/Bake.tscn` **overwrites hand edits** of code-built scenes; `-- --only=hub` rebuilds the Lounge and then **lighting must be re-baked**.
+- Test: `godot --path . -- --autotest [--fast] [--lookdev]` (24 checks pass headless on the Mac build). Launchers on the Mac: Metal, Safe Metal, Vulkan, Compatibility (`--safe`).
+- Mac logs: `~/Library/Application Support/Godot/app_userdata/WalkSim - Event Horizon/logs/godot.log`.
 
-### Astral Train spec (Biome 01)
-Linear along -Z; modules have EntrySocket/ExitSocket Marker3D. Vestibule start (rear door = return to hub), chain of carriages
-from 3 era pools with Vestibule_Connector between, never the same era twice in a row, cap with hand-built `Car_ObservationDome`.
-Palettes: 1920s lamps `#FFB84D`, carpet `#4A1219`; 1970s panel `#4E311F`, curtains `#C48B28`; 1980s neon `#D92B8A` / `#24D9E6`;
-dome seats `#101828`, nebula `#1A0F2E` / `#2D6A73`.
-`AstralCosmicDirector`: ring ribbon at x=+120m; train static, starfield scrolls; nebula pocket cycles 35-80s (`#3A7D8C` / `#6E2C5E`);
-reveal: rings part along a sine curve 4-6s showing a coiled silhouette, then snap back; low metallic resonance, duck interior jazz.
+## Status
 
-## Work so far
+- Hub (Art Deco, baked) + Astral Train + Oil Rig are playable on the Mac. Eight other worlds are sealed cartridges.
+- **Not yet confirmed:** the deco Lounge and flicker fix have not been seen in a Metal window on the user's GPU.
+- **Known look issues in the shipped build:** Gargantua far too small; bulkhead end too dark; strong floor glare near the bar; furniture is primitive.
+- Round B (Grok sandbox only): 18 CC0 Poly Haven models downloaded but unused; wider viewport sketched in `HubBuilder.gd` (not baked);
+  offline Schwarzschild ray tracer `tools_gen/blackhole.py` and textures/shaders for a prebaked Gargantua generated but not wired in.
 
-Grok built a first vertical slice (Hub + Astral Train, 8 carriages) from the spec above. **Result: not impressive.**
-Gemini's diagnosis (agreed by the user):
-1. Code-built geometry is sterile: primitives, flat colours, no PBR. Code is good for systems, poor at set dressing.
-2. 8 sparse carriages is a treadmill. 2-3 tightly packed, cluttered cars are far more atmospheric.
-3. The payoff did not escalate: the nebula and rings are visible from every window, so the dome is not a reveal. Hide the reveal until the dome, or change the scale (blinds mostly drawn, dome looks straight *up*).
+## Next steps (agreed priority)
 
-(Grok bot's own workings and file state: **TODO, user to supply**.)
+1. Finish the Lounge: integrate CC0 furniture (large pieces lightmap-static), huge Metal-safe prebaked Gargantua filling the window, lift the bulkhead end, cut bar glare; rebuild hub, **re-bake**, autotest, lookdev.
+2. Back up the Mac copy, deploy, have the user test in a **Metal window** and report flicker, black-hole scale, darkness, glare, furniture feel.
+3. Give the Astral Train the same visual pass. Gemini's critique of the first build: 8 sparse cars are a treadmill (prefer 2-3 dense cars with story props),
+   and the reveal should not be visible from every window before the dome.
+4. Then the other worlds, about 1-2 per week: **07 Desert Motel**, then **10 Pulsar Observatory**.
 
-## Direction going forward
-
-- Grok/Claude write the **systems** (console, scene loader, directors); **art comes from real assets**: free PBR textures from Poly Haven / AmbientCG, vintage props from Sketchfab (check licences). Blender for custom props.
-- Lean on lighting and post: ambient near zero, SDFGI or VoxelGI, volumetric fog, tight warm spotlights with real shadows, film grain + vignette + colour-grading LUT.
-- Build **one tiny dense diorama first** (e.g. the Motel lot plus one room, or one heavily cluttered 1920s carriage where every table tells a story), then scale.
-- Open choice offered by Gemini: (a) upgrade the visual pipeline with a concrete Godot 4 lighting/shader/PBR checklist, or (b) redesign the Astral Train as a tight 3-car experience with interactive storytelling props. Not yet decided.
-
-## Open items
-- Decide (a) vs (b) above.
-- Get Grok's implementation notes and current repo state into this file.
-- Source-chat detail not captured here (some PDF text was clipped): full per-biome blueprints for #12, #3, #26, #1, #6.
+Working style: test each build and give one batch of feedback rather than many small rounds (usage is limited and there is no overspend).
